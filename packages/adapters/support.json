@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "inspectedInstalledVersions": {
+    "node": "24.15.0",
+    "claudeCode": "2.1.286",
+    "codex": "0.159.3"
+  },
+  "inspections": [
+    "claude --help",
+    "claude --version",
+    "codex exec --help",
+    "codex --version"
+  ],
+  "officialReferences": [
+    "https://code.claude.com/docs/en/hooks",
+    "https://developers.openai.com/codex/noninteractive"
+  ],
+  "claudeCode": {
+    "transport": "opt-in project command hooks (sync Stop/test-edit; async Bash failure feed)",
+    "events": ["Stop", "PostToolUseFailure", "PostToolUse"],
+    "actualProviderSessionTested": true,
+    "actualProductCallbacksVerified": [
+      "sync Stop claim via product factory config (delivered 2ms after session exit)",
+      "PostToolUse(Write) delivery"
+    ],
+    "stopDelivery": "sync Stop required: an async Stop entry produced no receipt within 25s of an actual restricted headless session exit, while the same run with a sync Stop entry delivered the claim event",
+    "productDeliveryVerified": "actual Write callback metadata reached real loopback HTTP/private dashboard as edit:suspected; revoked credential denied",
+    "stableRunnerBinding": false,
+    "numericExitCode": "unavailable in inspected native PostToolUse payload; is_error false is not exit zero",
+    "D1": "unknown: native hooks lack authoritative numeric exit and isolated source binding",
+    "D2": "suspected only: bounded cause HMAC; native hooks cannot prove source progress"
+  },
+  "codex": {
+    "transport": "opt-in codex exec --ignore-user-config --ephemeral --skip-git-repo-check --sandbox read-only --json wrapper",
+    "passiveHooks": false,
+    "actualProviderSessionTested": true,
+    "productWrapperRuntimeVerified": true,
+    "stableRunnerBinding": "verified actual numeric exit 0/1 and one executed test for product-owned temporary fixtures; final native claims delivered through paired worker and real loopback HTTP to resolved/detected issues",
+    "verificationScope": "controlled intentional contradiction probes with local OAuth identity fixture, not an independent real-world false-completion benchmark or real GitHub OAuth",
+    "D1": "started/completed IDs, actual exit, full NODE_TAP_V1 totals and before/completed/claim snapshots; general project scope unknown",
+    "D2": "suspected: same-run bounded cause HMAC plus selected-scope progress HMAC; not proof of no external progress"
+  },
+  "localRunner": {
+    "profile": "NODE_TAP_V1",
+    "command": "node --test --test-reporter=tap <explicit approved files>",
+    "shell": false,
+    "requires": [
+      "actual exit",
+      "full TAP",
+      "nonzero executed tests",
+      "before/after/claim scoped snapshots",
+      "isolated scope"
+    ],
+    "generalWorkspaceGuarantee": false
+  },
+  "limits": [
+    "Earlier capability-only probes do not establish product integration; current native fixture delivery receipts separately verify selected local product paths",
+    "Async Claude Stop delivery was dropped at session exit in headless probes; the product config now uses sync Stop and keeps missing numeric exit unknown",
+    "hostVersion 0.0.0 denotes unknown, never an observed installed version",
+    "nodeMajor 0 denotes unavailable runner version; owned fixtures require the collector's absolute Node executable",
+    "Codex wrapper-only: one bounded prompt, no user-supplied exec flags",
+    "General project selected scope remains unproven; caller isolated flags cannot elevate host evidence",
+    "Worker requires worker --opt-in, stops on SIGTERM/SIGINT and respects spool quota/retention/backoff",
+    "No provider model calls made by executor",
+    "No provider credentials read",
+    "No remote OAuth app registration or deployment",
+    "No same-user hostile-process isolation",
+    "No server attestation of an authorized malicious collector",
+    "p95 enqueue latency must be measured against the 5ms target",
+    "Actual ENOSPC fault injection ran on an owned 4MB ram volume: write failures surfaced as loss with coverage unknown, the retained spool stayed readable, and enqueue recovered after space was freed. Power-loss durability remains unverified",
+    "Crash lock is fail-closed and requires owned manual recovery",
+    "No backup/remote deployment policy implemented",
+    "Project .claude directory must be private 0700 before explicit setup apply"
+  ]
+}
