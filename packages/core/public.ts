@@ -4,8 +4,16 @@ const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const count = z.number().int().min(0).max(1000000);
 export const evidenceSchema = z
   .object({
-    runnerProfile: z.enum(["NODE_TAP_V1", "unsupported"]),
-    commandClass: z.enum(["approved-node-test", "unsupported"]),
+    runnerProfile: z.enum([
+      "NODE_TAP_V1",
+      "NODE_TAP_ISOLATED_V1",
+      "unsupported",
+    ]),
+    commandClass: z.enum([
+      "approved-node-test",
+      "approved-isolated-node-test",
+      "unsupported",
+    ]),
     exitCode: z.number().int().min(0).max(255).nullable(),
     tests: count,
     pass: count,
@@ -117,10 +125,20 @@ export function judge(
       reason: "No unambiguous completed-test claim",
     };
   const e = event.evidence;
+  const supportedProfile =
+    e &&
+    ((e.runnerProfile === "NODE_TAP_V1" &&
+      e.commandClass === "approved-node-test") ||
+      (e.runnerProfile === "NODE_TAP_ISOLATED_V1" &&
+        e.commandClass === "approved-isolated-node-test" &&
+        event.nodeMajor === 24 &&
+        e.tests === 5 &&
+        e.skipped === 0 &&
+        e.todo === 0 &&
+        e.scopeId === `isolated-${e.before}`));
   if (
     !e ||
-    e.runnerProfile !== "NODE_TAP_V1" ||
-    e.commandClass !== "approved-node-test" ||
+    !supportedProfile ||
     event.nodeMajor < 20 ||
     !e.completed ||
     !e.fullOutput ||
