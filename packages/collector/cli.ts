@@ -1,5 +1,5 @@
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
@@ -8,6 +8,10 @@ import {
   approvedOrigin,
   collectorWorker,
   createOwnedFixture,
+  prepareIsolatedSelection,
+  runIsolatedNodeTest,
+  closeIsolatedSelection,
+  IsolatedRefusal,
 } from "./public.ts";
 import type { SelectedScope } from "./public.ts";
 import { readPrivate, atomicPrivate, removePrivate } from "./storage.ts";
@@ -70,6 +74,10 @@ export async function runCodex(
     );
   });
   const context = hostContext(scope, version, randomUUID());
+  // Tamper evidence: the opted-in scope is hashed immediately before and after
+  // the observed run. Isolation of the Codex child itself is not proven here,
+  // so coverage stays "unproven" even when both digests match.
+  const beforeDigest = collector.snapshot(scope.root, scope.files);
   const child = launch(
     "codex",
     [
@@ -174,12 +182,25 @@ export async function runCodex(
   process.removeListener("SIGINT", cancellation);
   if (context.loss || buffer || dropping || context.pending.size)
     collector.gap();
+  const afterDigest = collector.snapshot(scope.root, scope.files);
+  const changed = beforeDigest !== afterDigest;
+  // A null digest means the scope could not be hashed: that is an unknown, not
+  // a clean run, so it records a gap just like a changed scope.
+  const unreadable = beforeDigest === null || afterDigest === null;
+  if (changed || unreadable) collector.gap();
   const result = {
     hostVersion: version,
     versionKnown: version !== "0.0.0",
     processExitCode: exit,
     events,
     loss: context.loss || Boolean(buffer || dropping || context.pending.size),
+    digest: { before: beforeDigest, after: afterDigest, changed },
+    coverage: "unproven" as const,
+    coverageReason: unreadable
+      ? "The opted-in scope could not be fully hashed, so no before/after claim is made."
+      : changed
+        ? "The opted-in scope changed during the run, so passing output cannot be tied to the observed source."
+        : "The wrapper hashes the opted-in scope only; child-process isolation and general workspace coverage remain unproven.",
   };
   if (probe) console.log(JSON.stringify(result));
   return result;
@@ -240,15 +261,9 @@ export async function main(args = process.argv.slice(2)) {
       console.log("Paired. No events received until opted-in adapters run.");
       break;
     }
-    case "status": {
-      let connected = false;
-      try {
-        collector.load();
-        connected = true;
-      } catch {}
-      console.log(JSON.stringify({ paired: connected, ...collector.report() }));
+    case "status":
+      console.log(JSON.stringify(collector.statusReceipt()));
       break;
-    }
     case "report":
       console.log(JSON.stringify(collector.report(), null, 2));
       break;
@@ -279,9 +294,11 @@ export async function main(args = process.argv.slice(2)) {
       break;
     }
     case "disconnect":
-      await collector.disconnect();
       console.log(
-        "Remote credential invalidated or already denied; owned credential/spool removed. Adapter configuration is unchanged; use setup --uninstall --apply.",
+        JSON.stringify({
+          ...(await collector.disconnect()),
+          adapterConfiguration: "unchanged",
+        }),
       );
       break;
     case "setup": {
@@ -296,7 +313,7 @@ export async function main(args = process.argv.slice(2)) {
           claudeSetup(
             project,
             dir,
-            new URL("./cli.ts", import.meta.url).pathname,
+            fileURLToPath(import.meta.url),
             args.includes("--apply"),
             args.includes("--uninstall"),
           ),
@@ -305,40 +322,54 @@ export async function main(args = process.argv.slice(2)) {
       break;
     }
     case "receive": {
-      const host = option("--host");
-      if (host !== "claude-code" && host !== "codex")
-        throw new Error("Explicit host required");
-      let input = "",
-        over = false;
-      // Native async hooks do not enforce their configured timeout.
-      const deadline = setTimeout(() => {
-        over = true;
-        process.stdin.destroy();
-      }, 3000);
+      // Host hooks must never fail a session: every outcome prints one receipt
+      // line with an explicit reason and the process exits 0.
+      let received = false,
+        reason = "receive-error";
       try {
-        for await (const chunk of process.stdin) {
-          if (Buffer.byteLength(input) + chunk.length > 262144) {
-            over = true;
-            break;
-          }
-          input += chunk.toString();
-        }
-      } catch {
-        over = true;
-      } finally {
-        clearTimeout(deadline);
-      }
-      if (!over) {
+        const host = option("--host");
+        if (host !== "claude-code" && host !== "codex")
+          throw new Error("Explicit host required");
+        let input = "",
+          over = false;
+        // Native async hooks do not enforce their configured timeout.
+        const deadline = setTimeout(() => {
+          over = true;
+          process.stdin.destroy();
+        }, 3000);
         try {
-          const event = normalizeHost(JSON.parse(input), host, collector, 0);
-          if (event) {
-            event.sequence = collector.nextSequence(event.runId);
-            collector.enqueue(event);
+          for await (const chunk of process.stdin) {
+            if (Buffer.byteLength(input) + chunk.length > 262144) {
+              over = true;
+              break;
+            }
+            input += chunk.toString();
           }
         } catch {
-          collector.gap();
+          over = true;
+        } finally {
+          clearTimeout(deadline);
         }
-      } else collector.gap();
+        if (over) {
+          collector.gap();
+          reason = "payload-too-large";
+        } else {
+          try {
+            const event = normalizeHost(JSON.parse(input), host, collector, 0);
+            if (event) {
+              event.sequence = collector.nextSequence(event.runId);
+              received = collector.enqueue(event);
+              reason = received ? "queued" : "duplicate";
+            } else reason = "unsupported-event";
+          } catch {
+            collector.gap();
+            reason = "invalid-event";
+          }
+        }
+      } catch {
+        reason = "receive-error";
+      }
+      console.log(JSON.stringify({ received, reason }));
       break;
     }
     case "codex-fixture":
@@ -386,9 +417,49 @@ export async function main(args = process.argv.slice(2)) {
       }
       break;
     }
+    case "isolated-test": {
+      // Opt-in, single selected worktree. The fixed profile and argv live in
+      // isolated-node.ts; no caller-supplied command, file, or flag is used.
+      const seen = new Set<string>();
+      for (let index = 1; index < args.length; index++) {
+        const flag = args[index]!;
+        if (
+          !["--opt-in", "--project", "--dir"].includes(flag) ||
+          seen.has(flag)
+        )
+          throw new Error("Only explicit isolated-test options are supported");
+        seen.add(flag);
+        if (
+          flag !== "--opt-in" &&
+          (!args[++index] || args[index]!.startsWith("--"))
+        )
+          throw new Error("An explicit option value is required");
+      }
+      if (!args.includes("--opt-in"))
+        throw new Error("Explicit --opt-in required");
+      const project = option("--project");
+      if (!project) throw new Error("Explicit --project PATH required");
+      const selection = prepareIsolatedSelection(collector, resolve(project));
+      try {
+        const result = await runIsolatedNodeTest(collector, selection);
+        console.log(JSON.stringify(result));
+        process.exitCode =
+          result.completed &&
+          !result.loss &&
+          result.fullOutput &&
+          result.tests === 5 &&
+          result.skipped + result.todo === 0 &&
+          result.cleanup.verified
+            ? (result.exitCode ?? 1)
+            : 1;
+      } finally {
+        closeIsolatedSelection(selection);
+      }
+      break;
+    }
     default:
       console.log(
-        "Commands: connect, redeem, status, report, flush, worker --opt-in, rotate, disconnect, receive, setup, codex-fixture --opt-in [--passing] [--capability-probe], codex-exec --opt-in --project PATH --scope FILES --tests FILES -- PROMPT. Use --dir PRIVATE_DIR. General workspace coverage remains unproven.",
+        "Commands: connect, redeem, status, report, flush, worker --opt-in, rotate, disconnect, receive, setup, codex-fixture --opt-in [--passing] [--capability-probe], codex-exec --opt-in --project PATH --scope FILES --tests FILES -- PROMPT, isolated-test --opt-in --project PATH. Use --dir PRIVATE_DIR. General workspace coverage remains unproven.",
       );
   }
 }
@@ -414,7 +485,9 @@ if (
               ? "The service rejected the credential (401/403). Pair again with a new connect -> web approval -> redeem, then retry."
               : status === 400
                 ? "The service rejected the request format (400). Re-check the pairing code and that every command uses the same --dir."
-                : "Collector operation failed. Check private permissions, explicit options, approval and service availability. No secrets displayed.";
+                : error instanceof IsolatedRefusal
+                  ? `The isolated test profile was refused before launch (${error.code}). Keep the approved worktree unchanged and verify macOS sandbox availability. No unsandboxed fallback exists.`
+                  : "Collector operation failed. Check private permissions, explicit options, approval and service availability. No secrets displayed.";
     console.error(action);
     process.exitCode = 1;
   });

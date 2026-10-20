@@ -1,0 +1,24 @@
+{
+  "schema": "collector-sync-slice.v1",
+  "slice": "COL-T04a",
+  "producerMerge": "93d62fb8075f86d3bc342dddcc70cf176dff5558",
+  "producerFreezeSha256": "33eea106594de252eb4f320da6f5b0270ce5253555d398014d701d778b64d77e",
+  "sourceParity": {
+    "packages/collector/public.ts": "0573d8c9f1960d829c6b03301cc483589523fea39120116a0e53d1376b698d0e",
+    "packages/collector/cli.ts": "7f7e5b2a599ec5af6f3d217518994e6bd0c83cd628916161a6804d6a8f9690c9",
+    "packages/collector/storage.ts": "6350991c31686c39598b56781ff1892777f9ea88aedff76aeec147f451f41c44",
+    "packages/collector/isolated-node.ts": "de810b6292403ee4862bb063799d824cb7a4b8d49f7215ca20d6b1e5c0d28a78"
+  },
+  "consumerBase": "8ec501b67a0046fc8a68043a8dd896fa0f3351d8",
+  "verification": {
+    "check": 0,
+    "tests": 68,
+    "pass": 68,
+    "fail": 0,
+    "skipped": 0,
+    "build": 0,
+    "compiledCli": "status, missing opt-in refusal, owned hook setup/uninstall"
+  },
+  "remaining": "Adapters/core final sync and consumer regressions are COL-T04b. Real model execution remains blocked; this receipt is not a model claim.",
+  "finalReceipt": false
+}

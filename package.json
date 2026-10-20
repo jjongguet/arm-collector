@@ -7,10 +7,12 @@
     "node": ">=24.15"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "collector": "node packages/collector/cli.ts",
+    "pretest": "npm run build",
     "test": "node --test --test-reporter=tap tests/*.test.ts",
     "check": "tsc --noEmit",
-    "format": "prettier --write packages tests package.json tsconfig.json README.md"
+    "format": "prettier --write packages tests package.json tsconfig.json tsconfig.build.json README.md"
   },
   "dependencies": {
     "zod": "^4.1.0"

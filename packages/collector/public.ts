@@ -386,21 +386,38 @@ export class Collector {
       this.gap();
     }
   }
+  /**
+   * Idempotent disconnect. A directory that was never paired (or was already
+   * disconnected) still has its owned local state removed and reports why no
+   * remote call happened; an expired or revoked credential counts as denied.
+   */
   async disconnect() {
-    const c = this.load();
+    let connection: { origin: string; token: string } | null = null;
     try {
-      await request(c.origin, "/api/disconnect", {}, c.token);
+      connection = this.load();
     } catch (error) {
-      if (!(
-        error instanceof Error &&
-        "status" in error &&
-        error.status === 401
-      ))
+      if ((error as NodeJS.ErrnoException | null)?.code !== "ENOENT")
         throw error;
     }
-    removePrivate(join(this.dir, "connection.json"));
-    removePrivate(join(this.dir, "spool.json"));
+    let remote: "invalidated" | "already-denied" | "not-paired" = "not-paired";
+    if (connection) {
+      try {
+        await request(
+          connection.origin,
+          "/api/disconnect",
+          {},
+          connection.token,
+        );
+        remote = "invalidated";
+      } catch (error) {
+        if (error instanceof Error && "status" in error && error.status === 401)
+          remote = "already-denied";
+        else throw error;
+      }
+    }
     for (const name of [
+      "connection.json",
+      "spool.json",
       "sequences.json",
       "health-gap.json",
       "coverage-gap",
@@ -410,6 +427,27 @@ export class Collector {
     ])
       if (existsSync(join(this.dir, name))) removePrivate(join(this.dir, name));
     this.lostInMemory = 0;
+    this.origin = null;
+    return { disconnected: true as const, remote };
+  }
+  /** Stable status receipt: connection identity and queue state, never a token. */
+  statusReceipt() {
+    const report = this.report();
+    try {
+      const c = this.load();
+      return {
+        paired: true as const,
+        origin: c.origin,
+        deviceId: c.deviceId,
+        projectId: c.projectId,
+        expires: c.expires,
+        ...report,
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException | null)?.code !== "ENOENT")
+        throw error;
+      return { paired: false as const, origin: null, ...report };
+    }
   }
   key() {
     const path = join(this.dir, "scope-key");
@@ -725,3 +763,35 @@ export async function collectorWorker(
     });
   }
 }
+export {
+  ARM_ISOLATED_PROFILE,
+  ISOLATED_COMMAND_CLASS,
+  ISOLATED_OUTPUT_LIMIT,
+  ISOLATED_PROFILE_ID,
+  ISOLATED_RUNNER_PROFILE,
+  ISOLATED_SCOPE_ID,
+  ISOLATED_TEST_ARGV,
+  ISOLATED_TEST_FILE,
+  ISOLATED_TIMEOUT_MS,
+  IsolatedRefusal,
+  PINNED_NODE_EXECUTABLE,
+  PINNED_NODE_LABEL,
+  SANDBOX_EXEC,
+  closeIsolatedSelection,
+  isCurrentIsolatedObservation,
+  prepareIsolatedSelection,
+  runIsolatedNodeTest,
+} from "./isolated-node.ts";
+export type {
+  IsolatedCanary,
+  IsolatedCanaryName,
+  IsolatedCanaryOutcome,
+  IsolatedCleanup,
+  IsolatedManifestEntry,
+  IsolatedObservation,
+  IsolatedProfile,
+  IsolatedRefusalCode,
+  IsolatedRefusedReason,
+  IsolatedRunOptions,
+  IsolatedSelection,
+} from "./isolated-node.ts";
