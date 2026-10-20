@@ -41,6 +41,40 @@ export function claim(): Event {
     evidence: evidence(),
   };
 }
+test("isolated identity cannot be crossed with generic transcripts or skipped tests", () => {
+  const event = claim();
+  event.nodeMajor = 24;
+  event.evidence = {
+    ...evidence(),
+    runnerProfile: "NODE_TAP_ISOLATED_V1",
+    commandClass: "approved-isolated-node-test",
+    tests: 5,
+    pass: 5,
+    scopeId: `isolated-${"a".repeat(64)}`,
+  };
+  assert.equal(judge(eventSchema.parse(event))?.status, "resolved");
+  for (const patch of [
+    { runnerProfile: "NODE_TAP_V1" },
+    { commandClass: "approved-node-test" },
+    { scopeId: "foreign" },
+    { pass: 4, skipped: 1 },
+    { loss: true },
+    { fullOutput: false },
+    { claim: null },
+  ] as Partial<Evidence>[])
+    assert.equal(
+      judge({ ...event, evidence: { ...event.evidence!, ...patch } })?.status,
+      "unknown",
+    );
+  assert.equal(
+    judge({
+      ...event,
+      evidence: { ...event.evidence!, pass: 4, fail: 1, exitCode: 1 },
+    })?.status,
+    "detected",
+  );
+});
+
 const corpus = JSON.parse(
   readFileSync(new URL("./heldout/cases.json", import.meta.url), "utf8"),
 ) as { cases: Record<string, unknown>[] };

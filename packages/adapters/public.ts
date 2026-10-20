@@ -1,8 +1,16 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { readFileSync, existsSync, mkdirSync, lstatSync } from "node:fs";
 import { join, resolve, basename } from "node:path";
-import { Collector, baseEvent, isOwnedFixture } from "../collector/public.ts";
-import type { SelectedScope } from "../collector/public.ts";
+import {
+  Collector,
+  baseEvent,
+  isOwnedFixture,
+  isCurrentIsolatedObservation,
+} from "../collector/public.ts";
+import type {
+  SelectedScope,
+  IsolatedObservation,
+} from "../collector/public.ts";
 import {
   atomicPrivate,
   noSymlinks,
@@ -10,6 +18,47 @@ import {
 } from "../collector/storage.ts";
 import { classifyClaim, parseTap } from "../core/public.ts";
 import type { Event, Evidence } from "../core/public.ts";
+
+// Explicit local diagnostic claim, not a claim that the model ran these tests.
+// Only the original in-process observation can authorize isolated evidence;
+// replayed JSON and ordinary Codex command transcripts cannot do so.
+export function isolatedClaimEvent(
+  collector: Collector,
+  observation: IsolatedObservation,
+  claim: string,
+): Event {
+  const event = baseEvent("fixture", randomUUID(), 2);
+  event.kind = "claim";
+  event.claimClass = classifyClaim(claim, "assistant");
+  event.nodeMajor = 0;
+  if (!isCurrentIsolatedObservation(collector, observation)) return event;
+  event.nodeMajor = 24;
+  event.hostVersion = "24.15.0";
+  event.evidence = {
+    runnerProfile: observation.runnerProfile,
+    commandClass: observation.commandClass,
+    exitCode: observation.exitCode,
+    tests: observation.tests,
+    pass: observation.pass,
+    fail: observation.fail,
+    cancelled: observation.cancelled,
+    skipped: observation.skipped,
+    todo: observation.todo,
+    completed: observation.completed,
+    fullOutput: observation.fullOutput,
+    background: false,
+    loss: observation.loss || !observation.cleanup.verified,
+    startedSequence: 0,
+    completedSequence: 1,
+    scopeId: observation.scopeId,
+    coverage: observation.coverage,
+    before: observation.selectionDigest,
+    after: observation.selectionDigest,
+    claim: observation.selectionDigest,
+  };
+  return event;
+}
+
 export type HostContext = {
   scope: SelectedScope;
   version: string;

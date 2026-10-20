@@ -18,8 +18,14 @@ import {
   baseEvent,
   observeNodeTest,
   createOwnedFixture,
+  prepareIsolatedSelection,
+  runIsolatedNodeTest,
 } from "../packages/collector/public.ts";
-import { normalizeHost, claudeSetup } from "../packages/adapters/public.ts";
+import {
+  normalizeHost,
+  claudeSetup,
+  isolatedClaimEvent,
+} from "../packages/adapters/public.ts";
 import { judge } from "../packages/core/public.ts";
 import { readPrivate } from "../packages/collector/storage.ts";
 function fixture() {
@@ -31,6 +37,64 @@ function fixture() {
     close: () => rmSync(root, { recursive: true, force: true }),
   };
 }
+test("disconnect is idempotent and leaves foreign files untouched", async () => {
+  const f = fixture();
+  try {
+    const foreign = join(f.c.dir, "foreign.txt");
+    writeFileSync(foreign, "preserved", { mode: 0o600 });
+    assert.equal(f.c.statusReceipt().paired, false);
+    f.c.enqueue(baseEvent("fixture", "disconnect-run", 1));
+    assert.equal((await f.c.disconnect()).remote, "not-paired");
+    assert.equal((await f.c.disconnect()).remote, "not-paired");
+    assert.equal(readFileSync(foreign, "utf8"), "preserved");
+    assert.equal(f.c.statusReceipt().paired, false);
+  } finally {
+    f.close();
+  }
+});
+
+test(
+  "consumer observes the real isolated closure without promoting JSON copies",
+  {
+    skip:
+      process.platform !== "darwin"
+        ? "Seatbelt host required"
+        : !process.env.ARM_REAL_PROJECT_ROOT
+          ? "Explicit private ATM fixture not supplied"
+          : false,
+  },
+  async () => {
+    const f = fixture();
+    try {
+      const observed = await runIsolatedNodeTest(
+        f.c,
+        prepareIsolatedSelection(f.c, process.env.ARM_REAL_PROJECT_ROOT!),
+      );
+      assert.equal(observed.tests, 5, JSON.stringify(observed));
+      assert.equal(observed.pass, 5);
+      assert.equal(observed.exitCode, 0);
+      assert.equal(observed.loss, false);
+      assert.equal(observed.cleanup.verified, true);
+      assert.equal(
+        judge(isolatedClaimEvent(f.c, observed, "All tests passed."))?.status,
+        "resolved",
+      );
+      assert.equal(
+        judge(isolatedClaimEvent(f.c, { ...observed }, "All tests passed."))
+          ?.status,
+        "unknown",
+      );
+      f.c.gap();
+      assert.equal(
+        judge(isolatedClaimEvent(f.c, observed, "All tests passed."))?.status,
+        "unknown",
+      );
+    } finally {
+      f.close();
+    }
+  },
+);
+
 test("private secret storage and symlink denial", () => {
   const f = fixture();
   try {

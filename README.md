@@ -64,6 +64,23 @@ npm run collector -- codex-fixture --opt-in --passing --dir "$ARM_STATE"  # 통�
 
 기타 명령: `report`, `worker --opt-in`, `rotate`, `disconnect`. 전체 목록은 `npm run collector`로 확인한다.
 
+### 고정 ATM 격리 profile
+
+`isolated-test --opt-in --project <owned-worktree>`는 macOS arm64의 고정 Node
+24.15.0 바이너리와 Seatbelt로 승인된 ATM 17파일 closure의 전체 테스트 5건만 실행한다.
+일반 프로젝트 실행기가 아니며, 보호된 테스트·manifest·source 변경은 거부한다.
+읽기·보호된 쓰기·TCP/Unix socket·fork 거부 canary와 cleanup을 실제 확인한다.
+`NODE_TAP_ISOLATED_V1`은 일반 Codex 명령 전사와 별개다. `isolatedClaimEvent()`는
+동일 프로세스의 진짜 관측·동일 collector·현재 source·30초 freshness만 수용한다.
+복제된 JSON·gap·stale·skip은 `unknown`; 5/5 통과도 일반 정확성 보증은 아니다.
+CLI 영수증은 모델이 수리를 했거나 테스트를 통과했다고 주장했다는 증거가 아니다.
+
+공개 저장소에 private ATM 소스는 포함하지 않는다. 호스트 검증 시
+`ARM_REAL_PROJECT_ROOT`에 명시적으로 소유한 고정 ATM worktree를 지정한다.
+없으면 해당 단일 실호스트 테스트가 사유와 함께 skip되며, skip은 실측 완료가 아니다.
+`artifacts/source-sync-t04b.json`에는 최종 ARM producer의 7파일 내용 해시를 기록한다.
+이는 내용 동기화 증거이며 모델 실행·공개 서비스 출시 인증이 아니다.
+
 ## 검증
 
 ```sh
