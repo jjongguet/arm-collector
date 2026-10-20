@@ -84,7 +84,7 @@ CLI 영수증은 모델이 수리를 했거나 테스트를 통과했다고 주�
 ## 검증
 
 ```sh
-npm ci
+npm ci --ignore-scripts
 npm run check   # strict tsc --noEmit
 npm test        # node --test (core + collector + heldout 40 케이스)
 npm run build   # tsc -p tsconfig.build.json → dist/
@@ -95,6 +95,8 @@ npm run build   # tsc -p tsconfig.build.json → dist/
 ```sh
 node dist/collector/cli.js status --dir "$ARM_STATE"   # 컴파일된 CLI 실행
 ```
+
+CI(`.github/workflows/ci.yml`)는 `pull_request`와 `main` push에서 `arc-ci` 러너로 위 세 명령만 실행한다. 테스트는 임시 디렉터리 fixture와 대체 `fetch`만 사용하며, 실제 사용자 hook 설치, provider 자격증명 읽기, 실제 ARM 서버 전송을 하지 않는다. CI는 배포나 호스트 데몬/hook 설치를 수행하지 않는다.
 
 ## 라이선스
 
