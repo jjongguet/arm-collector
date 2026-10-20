@@ -1,3 +1,5 @@
 node_modules/
 .agent-reliability-monitor/
 .env*
+dist/
+.gjc/

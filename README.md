@@ -70,6 +70,13 @@ npm run collector -- codex-fixture --opt-in --passing --dir "$ARM_STATE"  # 통�
 npm ci
 npm run check   # strict tsc --noEmit
 npm test        # node --test (core + collector + heldout 40 케이스)
+npm run build   # tsc -p tsconfig.build.json → dist/
+```
+
+`npm run build`는 `packages/**/*.ts`를 `dist/`로 JavaScript 컴파일한다. 상대 `.ts` import는 `.js`로 재작성되므로 결과물은 Node ≥ 24.15에서 그대로 실행된다. `dist/`는 Git에 커밋하지 않는다.
+
+```sh
+node dist/collector/cli.js status --dir "$ARM_STATE"   # 컴파일된 CLI 실행
 ```
 
 ## 라이선스
