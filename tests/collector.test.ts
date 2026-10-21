@@ -127,6 +127,197 @@ test("private secret storage and symlink denial", () => {
     f.close();
   }
 });
+for (const changed of ["origin", "deviceId", "projectId"] as const) {
+  test(`re-pairing a private directory with a different ${changed} renews acknowledged loss`, async () => {
+    const f = fixture(),
+      original = globalThis.fetch;
+    const config = {
+      origin: "https://monitor.example",
+      token: "a".repeat(43),
+      deviceId: crypto.randomUUID(),
+      projectId: crypto.randomUUID(),
+      expires: Date.now() + 100000,
+    };
+    const calls: { url: string; body: string }[] = [];
+    try {
+      f.c.configure(config);
+      // An existing health file may be the only durable record of loss.
+      const health = join(f.c.dir, "health-gap.json");
+      writeFileSync(
+        health,
+        JSON.stringify({
+          event: baseEvent("fixture", "collector-coverage", 0),
+          acknowledgedAt: 0,
+        }),
+        { mode: 0o600 },
+      );
+      globalThis.fetch = async (input, options) => {
+        calls.push({ url: String(input), body: String(options?.body) });
+        return new Response("{}", { status: 200 });
+      };
+      await f.c.flush();
+      assert.equal(calls.length, 1);
+      const acknowledged = JSON.parse(readPrivate(health));
+      assert.ok(acknowledged.acknowledgedAt > 0);
+      assert.ok(Date.now() - acknowledged.acknowledgedAt < 86400000);
+      assert.equal(f.c.pendingGap(), null);
+      assert.equal(f.c.spool().lost, 0);
+      assert.equal(f.c.lostInMemory, 0);
+
+      const next = {
+        ...config,
+        [changed]:
+          changed === "origin"
+            ? "https://other-monitor.example"
+            : crypto.randomUUID(),
+      };
+      const rePaired = new Collector(f.c.dir);
+      rePaired.configure(next);
+      assert.equal(readPrivate(join(f.c.dir, "coverage-gap")), "1");
+      const restarted = new Collector(f.c.dir);
+      const pending = restarted.pendingGap();
+      assert.ok(pending);
+      assert.equal(pending.runId, "collector-coverage");
+      assert.notEqual(pending.eventId, acknowledged.event.eventId);
+      assert.equal(restarted.report().coverage, "unknown");
+      await restarted.flush();
+      assert.deepEqual(
+        calls.map((call) => call.url),
+        [config.origin + "/api/ingest", next.origin + "/api/ingest"],
+      );
+      assert.equal(calls[1]!.body, JSON.stringify({ events: [pending] }));
+      assert.equal(restarted.pendingGap(), null);
+      assert.equal(restarted.report().coverage, "unknown");
+    } finally {
+      globalThis.fetch = original;
+      f.close();
+    }
+  });
+}
+test("same-device rotation preserves sticky loss and pending retry bytes", async (t) => {
+  const f = fixture(),
+    original = globalThis.fetch;
+  const now = Date.now();
+  t.mock.timers.enable({ apis: ["Date"], now });
+  const config = {
+    origin: "https://monitor.example",
+    token: "a".repeat(43),
+    deviceId: crypto.randomUUID(),
+    projectId: crypto.randomUUID(),
+    expires: now + 3 * 86400000,
+  };
+  const bodies: string[] = [];
+  try {
+    f.c.configure(config);
+    f.c.gap();
+    const pending = f.c.pendingGap();
+    assert.ok(pending);
+    const health = join(f.c.dir, "health-gap.json");
+    const pendingBytes = readPrivate(health);
+    globalThis.fetch = async (input, options) => {
+      assert.equal(String(input), config.origin + "/api/ingest");
+      bodies.push(String(options?.body));
+      return new Response("{}", { status: bodies.length === 1 ? 503 : 200 });
+    };
+    await f.c.flush();
+    assert.equal(bodies.length, 1);
+    assert.equal(f.c.spool().failures, 1);
+    t.mock.timers.tick(86400001);
+    f.c.configure({ ...config, token: "b".repeat(43) });
+    const restarted = new Collector(f.c.dir);
+    assert.equal(readPrivate(join(f.c.dir, "coverage-gap")), "1");
+    assert.equal(readPrivate(health), pendingBytes);
+    assert.deepEqual(restarted.pendingGap(), pending);
+    assert.equal(readPrivate(health), pendingBytes);
+    await restarted.flush();
+    assert.deepEqual(bodies, [
+      JSON.stringify({ events: [pending] }),
+      JSON.stringify({ events: [pending] }),
+    ]);
+    const acknowledgedBytes = readPrivate(health);
+    restarted.configure({ ...config, token: "c".repeat(43) });
+    assert.equal(readPrivate(health), acknowledgedBytes);
+    assert.equal(restarted.pendingGap(), null);
+    assert.equal(restarted.hasGap(), true);
+    assert.equal(restarted.report().coverage, "unknown");
+  } finally {
+    globalThis.fetch = original;
+    f.close();
+  }
+});
+for (const blocked of ["coverage-gap", "health-gap.json"] as const) {
+  test(`re-pairing does not publish a new identity when ${blocked} cannot be updated`, () => {
+    const f = fixture();
+    const config = {
+      origin: "https://monitor.example",
+      token: "a".repeat(43),
+      deviceId: crypto.randomUUID(),
+      projectId: crypto.randomUUID(),
+      expires: Date.now() + 100000,
+    };
+    try {
+      f.c.configure(config);
+      const health = join(f.c.dir, "health-gap.json");
+      const bytes = JSON.stringify({
+        event: baseEvent("fixture", "collector-coverage", 0),
+        acknowledgedAt: Date.now(),
+      });
+      writeFileSync(health, bytes, { mode: 0o600 });
+      if (blocked === "coverage-gap")
+        mkdirSync(join(f.c.dir, blocked), { mode: 0o700 });
+      else chmodSync(health, 0o644);
+      assert.throws(() =>
+        f.c.configure({ ...config, deviceId: crypto.randomUUID() }),
+      );
+      assert.deepEqual(f.c.load(), config);
+      assert.equal(readFileSync(health, "utf8"), bytes);
+      assert.equal(new Collector(f.c.dir).hasGap(), true);
+      if (blocked === "health-gap.json")
+        assert.equal(readPrivate(join(f.c.dir, "coverage-gap")), "1");
+    } finally {
+      f.close();
+    }
+  });
+}
+test("local repeated-error findings become unknown with a coverage gap without rewriting events", () => {
+  const f = fixture();
+  try {
+    for (let sequence = 0; sequence < 3; sequence++) {
+      const event = baseEvent("fixture", "repeated-error", sequence);
+      event.kind = "error";
+      event.errorClass = "tool-failed";
+      event.progressFingerprint = "a".repeat(64);
+      assert.equal(f.c.enqueue(event), true);
+    }
+    const spool = join(f.c.dir, "spool.json");
+    const bytes = readPrivate(spool);
+    assert.deepEqual(f.c.report().findings, [
+      {
+        detector: "D2",
+        status: "suspected",
+        reason: "Repeated error without observed progress",
+      },
+    ]);
+    f.c.gap();
+    const findings = [
+      {
+        detector: "D2",
+        status: "unknown",
+        reason: "Observation coverage gap",
+      },
+      {
+        detector: "coverage",
+        status: "unknown",
+        reason: "Observation coverage gap",
+      },
+    ];
+    assert.deepEqual(f.c.report().findings, findings);
+    assert.deepEqual(new Collector(f.c.dir).report().findings, findings);
+    assert.equal(readPrivate(spool), bytes);
+  } finally {
+    f.close();
+  }
+});
 test("raw secret canaries never enter normalized spool or report", () => {
   const f = fixture();
   try {

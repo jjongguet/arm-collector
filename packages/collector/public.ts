@@ -138,9 +138,29 @@ export class Collector {
   configure(value: unknown) {
     const config = configuration.parse(value);
     approvedOrigin(config.origin);
-    atomicPrivate(join(this.dir, "connection.json"), JSON.stringify(config));
-    const marker = join(this.dir, "reauth-required");
-    if (existsSync(marker)) removePrivate(marker);
+    this.locked(() => {
+      let previous: z.infer<typeof configuration> | null = null;
+      try {
+        previous = this.load();
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      if (
+        (!previous ||
+          previous.origin !== config.origin ||
+          previous.deviceId !== config.deviceId ||
+          previous.projectId !== config.projectId) &&
+        this.hasGap()
+      ) {
+        // Persist loss before invalidating the old destination's acknowledgement
+        // or publishing the new identity. Token rotation leaves retry bytes alone.
+        atomicPrivate(join(this.dir, "coverage-gap"), "1");
+        removePrivate(join(this.dir, "health-gap.json"));
+      }
+      atomicPrivate(join(this.dir, "connection.json"), JSON.stringify(config));
+      const marker = join(this.dir, "reauth-required");
+      if (existsSync(marker)) removePrivate(marker);
+    });
   }
   spool() {
     try {
@@ -204,14 +224,18 @@ export class Collector {
       reauthRequired: reauth,
       findings: [
         ...current
-          .map((e, i) =>
-            judge(
-              loss && e.evidence
-                ? { ...e, evidence: { ...e.evidence, loss: true } }
-                : e,
-              current.slice(0, i),
-            ),
-          )
+          .map((e, i) => {
+            const finding = judge(e, current.slice(0, i));
+            return loss &&
+              finding &&
+              (finding.detector === "D1" || finding.detector === "D2")
+              ? {
+                  ...finding,
+                  status: "unknown" as const,
+                  reason: "Observation coverage gap",
+                }
+              : finding;
+          })
           .filter(Boolean),
         ...(loss
           ? [
