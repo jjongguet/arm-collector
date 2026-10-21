@@ -48,7 +48,11 @@ const retentionMs = 7 * 86400000;
 const sequenceCapacity = 4096;
 const sequenceSchema = z
   .record(
-    z.string().regex(/^[a-f0-9]{64}$/),
+    // Keyed by runId, so it must accept exactly what an event accepts. The two
+    // schemas were previously independent: a runId that eventSchema allowed
+    // (for example a legible label) could not be persisted here, which poisoned
+    // sequences.json and made every later collection call throw.
+    eventSchema.shape.runId,
     z
       .object({
         sequence: z.number().int().min(0).max(1000000),
