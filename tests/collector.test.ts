@@ -626,3 +626,27 @@ test("network failure retries only approved ingest, no judge or redirect", async
     f.close();
   }
 });
+
+// The sequence store is keyed by runId, so it must accept exactly the runIds an
+// event accepts. When the two schemas disagreed, one legible runId poisoned
+// sequences.json and every later call threw with no recovery path.
+test("a schema-valid runId never poisons the sequence store", () => {
+  const f = fixture();
+  try {
+    assert.equal(f.c.nextSequence("owned-run"), 0);
+    assert.equal(f.c.nextSequence("owned-run"), 1);
+    assert.equal(f.c.nextSequence("a".repeat(64)), 0);
+    assert.equal(f.c.enqueue(baseEvent("fixture", "owned-run", 2)), true);
+    // A restart reads the same file back and keeps counting.
+    const restarted = new Collector(f.c.dir);
+    assert.equal(restarted.nextSequence("owned-run"), 3);
+    assert.deepEqual(
+      Object.keys(
+        JSON.parse(readFileSync(join(f.c.dir, "sequences.json"), "utf8")),
+      ).sort(),
+      ["a".repeat(64), "owned-run"].sort(),
+    );
+  } finally {
+    f.close();
+  }
+});
