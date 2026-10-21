@@ -53,6 +53,8 @@ npm run collector -- flush --dir "$ARM_STATE"    # spool의 이벤트를 ARM 서
 npm run collector -- status --dir "$ARM_STATE"   # 연결·spool 상태 확인
 ```
 
+관측 공백이 있으면 로컬 `report`의 D1·D2도 서버와 같이 `unknown`으로 남는다. 전송 성공이나 같은 기기의 토큰 회전은 공백을 없애지 않는다. 공백이 있는 상태 디렉터리를 다른 기기·프로젝트·origin에 다시 연결하면 이전 수신 확인(ACK)을 재사용하지 않고 새 목적지에 관측 공백을 알린다. 같은 목적지의 재시도는 원래 이벤트 바이트를 유지한다. 새 연결이나 빈 대기열을 과거 관측 복구·현재 온라인·테스트 성공으로 해석하지 않는다.
+
 ### Codex opt-in fixture 프로브
 
 Codex는 수동 hook 설치 없이 opt-in exec wrapper로만 실행한다. `codex-fixture`는 통제된 소유 fixture 프로브로, 완료 주장과 실제 테스트 결과의 모순을 의도적으로 만들어 수집 경로를 검증한다.
