@@ -5,12 +5,15 @@ on:
   push:
     branches: [main]
 
+
 permissions:
   contents: read
 
 jobs:
   test:
-    runs-on: arc-ci
+    # JJO-584: public-repo PR code must not run on the self-hosted k3s runner.
+    # push (main) keeps arc-ci; pull_request builds run GitHub-hosted.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'arc-ci' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
