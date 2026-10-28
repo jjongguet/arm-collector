@@ -64,6 +64,21 @@ npm run collector -- codex-fixture --opt-in --dir "$ARM_STATE"            # 실�
 npm run collector -- codex-fixture --opt-in --passing --dir "$ARM_STATE"  # 통과 케이스 프로브
 ```
 
+### Codex 일반 프로젝트 opt-in 실행 (`codex-exec`)
+
+본인 프로젝트에서 Codex 한 번을 관측하려면 `codex-exec`를 쓴다. 관측 범위(`--scope`)와 그 안의 테스트 파일(`--tests`)을 명시해야 하며, `--tests`는 `--scope`의 부분집합이어야 한다. 프롬프트는 `--` 뒤 한 개 인자(최대 32,768바이트, `-`로 시작 불가)만 받고 Codex 플래그는 전달할 수 없다.
+
+```sh
+npm run collector -- codex-exec --opt-in --dir "$ARM_STATE" \
+  --project /absolute/path/to/your/project --scope src/a.js,test/a.test.js --tests test/a.test.js \
+  -- "test/a.test.js를 node --test --test-reporter=tap으로 실행하고 결과를 알려줘"
+```
+
+- 실행 형태는 고정이다: `codex exec --ignore-user-config --ephemeral --skip-git-repo-check --sandbox read-only --json <프롬프트>`. 실행 시간 120초·출력 8MiB·줄당 256KiB 상한을 넘으면 관측 손실로 기록한다.
+- 관측 결과는 **로컬 spool에만 쌓인다.** 전송은 별도의 opt-in `flush` 또는 `worker --opt-in`으로만 일어난다.
+- 기본 모드에서는 Codex의 원래 stdout/stderr가 터미널에 그대로 출력된다. 원문 미수집 보장은 spool과 전송 본문에 대한 것이며 터미널 출력에는 적용되지 않는다. `--capability-probe`를 붙이면 원문 대신 메타데이터 영수증 JSON 한 줄만 출력한다.
+- 승인된 `node --test --test-reporter=tap <테스트 파일>` 실행이 관측돼도 일반 프로젝트 범위는 `coverage: "unproven"`이고 D1 판정은 `unknown`이다. 실행 전후 범위 해시가 같아도 Codex 하위 프로세스의 격리는 증명되지 않기 때문이다. 확정 판정은 소유 fixture와 아래 고정 ATM 격리 profile에서만 나온다.
+
 기타 명령: `report`, `worker --opt-in`, `rotate`, `disconnect`. 전체 목록은 `npm run collector`로 확인한다.
 
 ### 고정 ATM 격리 profile
@@ -98,7 +113,7 @@ npm run build   # tsc -p tsconfig.build.json → dist/
 node dist/collector/cli.js status --dir "$ARM_STATE"   # 컴파일된 CLI 실행
 ```
 
-CI(`.github/workflows/ci.yml`)는 `pull_request`와 `main` push에서 `arc-ci` 러너로 위 세 명령만 실행한다. 테스트는 임시 디렉터리 fixture와 대체 `fetch`만 사용하며, 실제 사용자 hook 설치, provider 자격증명 읽기, 실제 ARM 서버 전송을 하지 않는다. CI는 배포나 호스트 데몬/hook 설치를 수행하지 않는다.
+CI(`.github/workflows/ci.yml`)는 `pull_request`와 `main`·`dev` push에서 `npm ci --ignore-scripts`, `npm run check`, `npm test`(pretest로 build 포함)를 실행한다. `pull_request`는 GitHub 호스트 `ubuntu-latest`, push는 `arc-ci` 러너에서 돈다(JJO-584: 공개 저장소 PR 코드는 자체 호스트 러너에서 실행하지 않는다). 테스트는 임시 디렉터리 fixture와 대체 `fetch`만 사용하며, 실제 사용자 hook 설치, provider 자격증명 읽기, 실제 ARM 서버 전송을 하지 않는다. CI는 배포나 호스트 데몬/hook 설치를 수행하지 않는다.
 
 ## 라이선스
 
