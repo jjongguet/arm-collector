@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import {
   Collector,
   baseEvent,
@@ -25,6 +26,7 @@ import {
   normalizeHost,
   claudeSetup,
   isolatedClaimEvent,
+  hostContext,
 } from "../packages/adapters/public.ts";
 import { judge } from "../packages/core/public.ts";
 import { readPrivate } from "../packages/collector/storage.ts";
@@ -646,6 +648,117 @@ test("a schema-valid runId never poisons the sequence store", () => {
       ).sort(),
       ["a".repeat(64), "owned-run"].sort(),
     );
+  } finally {
+    f.close();
+  }
+});
+
+// A general (non-fixture) codex-exec scope can carry complete, stable test
+// evidence, yet the wrapper never claims isolation for it. The isolated twin is
+// the positive control: only the coverage label differs between the two.
+test("general-scope codex evidence stays unproven and judges unknown", () => {
+  const f = fixture();
+  try {
+    const project = join(f.root, "project");
+    mkdirSync(project);
+    writeFileSync(join(project, "a.test.js"), "");
+    const scope = { root: project, files: ["a.test.js"], tests: ["a.test.js"] };
+    const context = hostContext(scope, "0.159.3", crypto.randomUUID());
+    const command = "node --test --test-reporter=tap a.test.js";
+    const tap =
+      "TAP version 13\n1..1\n# tests 1\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 1.2\n";
+    assert.equal(
+      normalizeHost(
+        { type: "item.started", item: { id: "c1", type: "command_execution", command } },
+        "codex",
+        f.c,
+        0,
+        context,
+      ),
+      null,
+    );
+    normalizeHost(
+      {
+        type: "item.completed",
+        item: { id: "c1", type: "command_execution", command, status: "completed", exit_code: 0, aggregated_output: tap },
+      },
+      "codex",
+      f.c,
+      1,
+      context,
+    );
+    const claim = normalizeHost(
+      { type: "item.completed", item: { id: "m1", type: "agent_message", text: "All tests passed." } },
+      "codex",
+      f.c,
+      2,
+      context,
+    )!;
+    assert.equal(claim.claimClass, "tests-passed");
+    assert.equal(claim.evidence?.coverage, "unproven");
+    assert.equal(claim.evidence?.exitCode, 0);
+    assert.equal(claim.evidence?.tests, 1);
+    // Neutralise the separate runner-version guard so coverage alone decides.
+    const general = { ...claim, nodeMajor: 24 };
+    assert.equal(judge(general)?.status, "unknown");
+    const isolatedTwin = { ...general, evidence: { ...general.evidence!, coverage: "isolated" as const } };
+    assert.equal(judge(isolatedTwin)?.status, "resolved");
+  } finally {
+    f.close();
+  }
+});
+
+test("receive orders accepted events per stable session and enqueues nothing unsupported", () => {
+  const f = fixture();
+  try {
+    const receive = (payload: unknown) => {
+      const result = spawnSync(
+        process.execPath,
+        ["packages/collector/cli.ts", "receive", "--host", "codex", "--dir", f.c.dir],
+        { input: JSON.stringify(payload), encoding: "utf8", timeout: 10000 },
+      );
+      assert.equal(result.status, 0, result.stderr);
+      return JSON.parse(result.stdout) as { received: boolean; reason: string };
+    };
+    const spooled = () =>
+      (JSON.parse(readPrivate(join(f.c.dir, "spool.json"))) as {
+        events: { runId: string; sequence: number }[];
+      }).events;
+    const claim = {
+      type: "item.completed",
+      thread_id: "thread-stable",
+      item: { type: "agent_message", text: "All tests passed." },
+    };
+    assert.deepEqual(receive(claim), { received: true, reason: "queued" });
+    assert.deepEqual(receive(claim), { received: true, reason: "queued" });
+    const stable = spooled();
+    assert.equal(stable.length, 2);
+    assert.equal(stable[0]!.runId, stable[1]!.runId);
+    assert.ok(stable[1]!.sequence > stable[0]!.sequence);
+    // Without a session/thread id each payload is its own run; only the receipt
+    // shape is part of the contract, not cross-run ordering.
+    const { thread_id: _, ...idless } = claim;
+    assert.deepEqual(receive(idless), { received: true, reason: "queued" });
+    const before = readPrivate(join(f.c.dir, "spool.json"));
+    assert.deepEqual(receive({ type: "turn.started" }), { received: false, reason: "unsupported-event" });
+    assert.equal(readPrivate(join(f.c.dir, "spool.json")), before);
+  } finally {
+    f.close();
+  }
+});
+
+test("re-enqueueing an event id is idempotent only for identical bytes", () => {
+  const f = fixture();
+  try {
+    const event = baseEvent("fixture", "owned-run", 0);
+    assert.equal(f.c.enqueue(event), true);
+    const spool = readPrivate(join(f.c.dir, "spool.json"));
+    assert.equal(f.c.enqueue(structuredClone(event)), true);
+    assert.equal(readPrivate(join(f.c.dir, "spool.json")), spool);
+    assert.equal(f.c.hasGap(), false);
+    assert.equal(f.c.enqueue({ ...event, sequence: 1 }), false);
+    assert.equal(readPrivate(join(f.c.dir, "spool.json")), spool);
+    assert.equal(f.c.hasGap(), true);
   } finally {
     f.close();
   }
