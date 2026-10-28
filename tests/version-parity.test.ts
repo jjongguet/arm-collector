@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import * as collector from "../packages/collector/public.ts";
 
@@ -77,5 +78,45 @@ test("the exported collector surface matches the parity fixture", () => {
       "request",
       "runIsolatedNodeTest",
     ].sort(),
+  );
+});
+
+// Cross-repository content parity cannot be proven from inside this repository,
+// so it is pinned to the newest published receipt instead. t04a/t04b are kept as
+// historical snapshots of their own producer commits and are deliberately not
+// checked against the current tree; only the current receipt binds to files on
+// disk, which is what makes a later drift fail here instead of going unnoticed.
+const CURRENT_RECEIPT = "artifacts/source-sync-t05.json";
+
+test("the current sync receipt matches the files in this checkout", () => {
+  const receipt = JSON.parse(readFileSync(CURRENT_RECEIPT, "utf8")) as {
+    schema: string;
+    slice: string;
+    producerFreezeSha256: string;
+    sourceParity: Record<string, string>;
+    finalReceipt: boolean;
+  };
+  assert.equal(receipt.schema, "collector-sync-slice.v1");
+  assert.equal(receipt.slice, "COL-T05");
+  assert.equal(receipt.finalReceipt, true);
+  const paths = Object.keys(receipt.sourceParity).sort();
+  assert.ok(paths.length > 0, "the receipt must name the files it pins");
+  for (const path of paths) {
+    const actual = createHash("sha256")
+      .update(readFileSync(path))
+      .digest("hex");
+    assert.equal(
+      actual,
+      receipt.sourceParity[path],
+      `${path} drifted from ${CURRENT_RECEIPT}; publish a new receipt instead of editing the old one`,
+    );
+  }
+  const canonical = JSON.stringify(
+    Object.fromEntries(paths.map((path) => [path, receipt.sourceParity[path]])),
+  );
+  assert.equal(
+    createHash("sha256").update(canonical).digest("hex"),
+    receipt.producerFreezeSha256,
+    "producerFreezeSha256 must be the canonical digest of sourceParity",
   );
 });
