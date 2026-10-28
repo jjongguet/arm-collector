@@ -36,7 +36,7 @@ function fakeCodex() {
   writeFileSync(join(project, "a.test.js"), "");
   writeFileSync(
     join(bin, "codex"),
-    `#!/bin/sh\necho "$1" >> '${marker}'\n`,
+    `#!/bin/sh\necho "$*" >> '${marker}'\n`,
   );
   chmodSync(join(bin, "codex"), 0o755);
   return {
@@ -60,6 +60,7 @@ test("codex-exec refuses incomplete opt-in before launching codex", () => {
       ["--opt-in", "--project", f.project, "--scope", "a.test.js", "--", "hi"],
       ["--opt-in", "--project", f.project, "--scope", "a.test.js", "--tests", "b.test.js", "--", "hi"],
       ["--opt-in", "--project", f.project, ...scope],
+      ["--opt-in", "--project", f.project, ...scope, "--", "-x"],
     ];
     for (const args of refused) {
       const result = invoke(["codex-exec", "--dir", f.dir, ...args], f.env);
@@ -72,7 +73,10 @@ test("codex-exec refuses incomplete opt-in before launching codex", () => {
       f.env,
     );
     assert.equal(accepted.status, 0, accepted.stderr);
-    assert.deepEqual(f.launches(), ["--version", "exec"]);
+    assert.deepEqual(f.launches(), [
+      "--version",
+      "exec --ignore-user-config --ephemeral --skip-git-repo-check --sandbox read-only --json hi",
+    ]);
     const receipt = JSON.parse(accepted.stdout);
     assert.equal(receipt.coverage, "unproven");
     assert.equal(receipt.versionKnown, false);

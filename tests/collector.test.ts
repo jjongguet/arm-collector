@@ -698,6 +698,7 @@ test("general-scope codex evidence stays unproven and judges unknown", () => {
     assert.equal(claim.evidence?.coverage, "unproven");
     assert.equal(claim.evidence?.exitCode, 0);
     assert.equal(claim.evidence?.tests, 1);
+    assert.equal(judge(claim)?.status, "unknown");
     // Neutralise the separate runner-version guard so coverage alone decides.
     const general = { ...claim, nodeMajor: 24 };
     assert.equal(judge(general)?.status, "unknown");
