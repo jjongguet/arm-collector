@@ -92,6 +92,91 @@ test("codex-exec accepts exactly one bounded prompt argument", () => {
     assert.deepEqual(validateCodexArgs(args), args);
 });
 
+for (const [name, events] of [
+  [
+    "error and turn.failed",
+    [
+      '{"type":"thread.started","thread_id":"t1"}',
+      '{"type":"turn.started"}',
+      '{"type":"error","message":"usage limit"}',
+      '{"type":"turn.failed","error":{"message":"usage limit"}}',
+    ],
+  ],
+  [
+    "turn.failed alone",
+    [
+      '{"type":"thread.started","thread_id":"t1"}',
+      '{"type":"turn.started"}',
+      '{"type":"turn.failed","error":{"message":"usage limit"}}',
+    ],
+  ],
+  [
+    "error alone",
+    [
+      '{"type":"thread.started","thread_id":"t1"}',
+      '{"type":"turn.started"}',
+      '{"type":"error","message":"usage limit"}',
+    ],
+  ],
+] as [string, string[]][])
+  test(`a zero exit code is not read as a passing turn (${name})`, () => {
+    // codex-cli 0.159.3 returns exit 0 while emitting `error` / `turn.failed`
+    // (observed live on 2026-10-29 when the account hit its usage limit). The
+    // wrapper must record a gap, not a clean run.
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "arm-exit-zero-")));
+    const bin = join(root, "bin"),
+      project = join(root, "project"),
+      state = join(root, "state");
+    mkdirSync(bin);
+    mkdirSync(project);
+    mkdirSync(state, { mode: 0o700 });
+    writeFileSync(join(project, "a.test.js"), "");
+    writeFileSync(
+      join(bin, "codex"),
+      `#!/bin/sh\nif [ "$1" = "exec" ]; then\n${events
+        .map((e) => `  echo '${e}'`)
+        .join("\n")}\n  exit 0\nfi\necho "codex-cli 0.159.3"\n`,
+    );
+    chmodSync(join(bin, "codex"), 0o755);
+    try {
+      const result = invoke(
+        [
+          "codex-exec",
+          "--dir",
+          state,
+          "--opt-in",
+          "--project",
+          project,
+          "--scope",
+          "a.test.js",
+          "--tests",
+          "a.test.js",
+          "--capability-probe",
+          "--",
+          "reply ok",
+        ],
+        { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` },
+      );
+      assert.equal(result.status, 0, result.stderr);
+      const line = result.stdout
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop();
+      assert.ok(line, result.stdout);
+      const probe = JSON.parse(line) as Record<string, unknown>;
+      assert.equal(probe.processExitCode, 0);
+      assert.equal(probe.loss, true);
+      assert.equal(probe.coverage, "unproven");
+      assert.ok(
+        existsSync(join(state, "coverage-gap")),
+        "a failed turn must leave a coverage gap",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
 test("the emitted CLI reports unpaired state without a network client", () => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "arm-built-status-")));
   try {
