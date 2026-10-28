@@ -1,0 +1,35 @@
+{
+  "schema": "collector-sync-slice.v1",
+  "slice": "COL-T05",
+  "producerMerge": "35d3751c3dfc23590ae5baba0cee0f4f68907392",
+  "producerFreezeSha256": "fab64280d94b0566092eeba5abde54190d978396844b2328b044a936abc00298",
+  "producerFreezeRule": "sha256 of the canonical JSON of sourceParity (keys sorted, separators ',', ':')",
+  "sourceParity": {
+    "packages/collector/public.ts": "8ba9092ed1d7ed961625fed7272da84c439cbcb1383fbdafa00fbfc0d3f39399",
+    "packages/collector/cli.ts": "7f7e5b2a599ec5af6f3d217518994e6bd0c83cd628916161a6804d6a8f9690c9",
+    "packages/collector/storage.ts": "6350991c31686c39598b56781ff1892777f9ea88aedff76aeec147f451f41c44",
+    "packages/collector/isolated-node.ts": "de810b6292403ee4862bb063799d824cb7a4b8d49f7215ca20d6b1e5c0d28a78",
+    "packages/adapters/public.ts": "a081ede64f13d09fcbc5974b7b833fb15b3bfd7d32eef278d832d46765541f6e",
+    "packages/adapters/support.json": "f18d3074b2d03ed20982574ca2f36037314391cff4acd4e706325bed5f948ee3",
+    "packages/core/public.ts": "8dce0be62c115054fae130519f0277e8305de7efb0fd34635e52fa52a6a9136d"
+  },
+  "consumerBase": "1db9c80066fb9a905282ca96690af1115ffe7325",
+  "consumerMainObserved": "8a41eed1ac96ca0be2603fa4b861f2b271c7a919",
+  "verification": {
+    "check": 0,
+    "tests": 85,
+    "pass": 84,
+    "fail": 0,
+    "skipped": 1,
+    "build": 0,
+    "node": "24.15.0",
+    "note": "측정은 t05와 version-parity 확장을 포함한 상태에서 실행했고, 수치를 기록한 뒤 같은 명령을 다시 실행해 t05가 자기 검사를 포함한 상태임을 확인했다."
+  },
+  "boundaries": [
+    "t04a/t04b는 각 시점의 사실 기록이며 수정하지 않는다. 이 영수증은 현재 상태만 기술한다.",
+    "Private ATM source not vendored.",
+    "No npm publication, credentials or global hooks changed.",
+    "Real model repair remains blocked; diagnostic claims are not model claims."
+  ],
+  "finalReceipt": true
+}
