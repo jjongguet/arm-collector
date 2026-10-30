@@ -34,10 +34,7 @@ function fakeCodex() {
   mkdirSync(bin);
   mkdirSync(project);
   writeFileSync(join(project, "a.test.js"), "");
-  writeFileSync(
-    join(bin, "codex"),
-    `#!/bin/sh\necho "$*" >> '${marker}'\n`,
-  );
+  writeFileSync(join(bin, "codex"), `#!/bin/sh\necho "$*" >> '${marker}'\n`);
   chmodSync(join(bin, "codex"), 0o755);
   return {
     project,
@@ -58,7 +55,17 @@ test("codex-exec refuses incomplete opt-in before launching codex", () => {
       ["--opt-in", ...scope, "--", "hi"],
       ["--opt-in", "--project", f.project, "--tests", "a.test.js", "--", "hi"],
       ["--opt-in", "--project", f.project, "--scope", "a.test.js", "--", "hi"],
-      ["--opt-in", "--project", f.project, "--scope", "a.test.js", "--tests", "b.test.js", "--", "hi"],
+      [
+        "--opt-in",
+        "--project",
+        f.project,
+        "--scope",
+        "a.test.js",
+        "--tests",
+        "b.test.js",
+        "--",
+        "hi",
+      ],
       ["--opt-in", "--project", f.project, ...scope],
       ["--opt-in", "--project", f.project, ...scope, "--", "-x"],
     ];
@@ -69,7 +76,18 @@ test("codex-exec refuses incomplete opt-in before launching codex", () => {
     }
     // Positive control: the same stand-in is launched once the opt-in is complete.
     const accepted = invoke(
-      ["codex-exec", "--dir", f.dir, "--opt-in", "--project", f.project, ...scope, "--capability-probe", "--", "hi"],
+      [
+        "codex-exec",
+        "--dir",
+        f.dir,
+        "--opt-in",
+        "--project",
+        f.project,
+        ...scope,
+        "--capability-probe",
+        "--",
+        "hi",
+      ],
       f.env,
     );
     assert.equal(accepted.status, 0, accepted.stderr);
@@ -158,11 +176,7 @@ for (const [name, events] of [
         { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` },
       );
       assert.equal(result.status, 0, result.stderr);
-      const line = result.stdout
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .pop();
+      const line = result.stdout.trim().split("\n").filter(Boolean).pop();
       assert.ok(line, result.stdout);
       const probe = JSON.parse(line) as Record<string, unknown>;
       assert.equal(probe.processExitCode, 0);

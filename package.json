@@ -3,23 +3,37 @@
   "version": "0.1.0",
   "private": false,
   "type": "module",
+  "description": "Agent Reliability Monitor collector SDK and CLI (generated read-only mirror of jjongguet/agent-reliability-monitor).",
+  "license": "MIT",
   "engines": {
     "node": ">=24.15"
   },
+  "bin": {
+    "arm-collector": "dist/collector/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/collector/public.d.ts",
+      "default": "./dist/collector/public.js"
+    },
+    "./cli": {
+      "types": "./dist/collector/cli.d.ts",
+      "default": "./dist/collector/cli.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "collector": "node packages/collector/cli.ts",
-    "pretest": "npm run build",
-    "test": "node --test --test-reporter=tap tests/*.test.ts",
     "check": "tsc --noEmit",
-    "format": "prettier --write packages tests package.json tsconfig.json tsconfig.build.json README.md"
+    "pretest": "npm run build",
+    "test": "node --test tests/*.test.ts",
+    "collector": "node dist/collector/cli.js"
   },
   "dependencies": {
     "zod": "^4.1.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "prettier": "^3.6.0",
     "typescript": "^5.9.0"
   }
 }

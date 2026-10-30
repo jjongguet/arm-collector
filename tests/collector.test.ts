@@ -669,7 +669,10 @@ test("general-scope codex evidence stays unproven and judges unknown", () => {
       "TAP version 13\n1..1\n# tests 1\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 1.2\n";
     assert.equal(
       normalizeHost(
-        { type: "item.started", item: { id: "c1", type: "command_execution", command } },
+        {
+          type: "item.started",
+          item: { id: "c1", type: "command_execution", command },
+        },
         "codex",
         f.c,
         0,
@@ -680,7 +683,14 @@ test("general-scope codex evidence stays unproven and judges unknown", () => {
     normalizeHost(
       {
         type: "item.completed",
-        item: { id: "c1", type: "command_execution", command, status: "completed", exit_code: 0, aggregated_output: tap },
+        item: {
+          id: "c1",
+          type: "command_execution",
+          command,
+          status: "completed",
+          exit_code: 0,
+          aggregated_output: tap,
+        },
       },
       "codex",
       f.c,
@@ -688,7 +698,10 @@ test("general-scope codex evidence stays unproven and judges unknown", () => {
       context,
     );
     const claim = normalizeHost(
-      { type: "item.completed", item: { id: "m1", type: "agent_message", text: "All tests passed." } },
+      {
+        type: "item.completed",
+        item: { id: "m1", type: "agent_message", text: "All tests passed." },
+      },
       "codex",
       f.c,
       2,
@@ -702,7 +715,10 @@ test("general-scope codex evidence stays unproven and judges unknown", () => {
     // Neutralise the separate runner-version guard so coverage alone decides.
     const general = { ...claim, nodeMajor: 24 };
     assert.equal(judge(general)?.status, "unknown");
-    const isolatedTwin = { ...general, evidence: { ...general.evidence!, coverage: "isolated" as const } };
+    const isolatedTwin = {
+      ...general,
+      evidence: { ...general.evidence!, coverage: "isolated" as const },
+    };
     assert.equal(judge(isolatedTwin)?.status, "resolved");
   } finally {
     f.close();
@@ -715,16 +731,25 @@ test("receive orders accepted events per stable session and enqueues nothing uns
     const receive = (payload: unknown) => {
       const result = spawnSync(
         process.execPath,
-        ["packages/collector/cli.ts", "receive", "--host", "codex", "--dir", f.c.dir],
+        [
+          "packages/collector/cli.ts",
+          "receive",
+          "--host",
+          "codex",
+          "--dir",
+          f.c.dir,
+        ],
         { input: JSON.stringify(payload), encoding: "utf8", timeout: 10000 },
       );
       assert.equal(result.status, 0, result.stderr);
       return JSON.parse(result.stdout) as { received: boolean; reason: string };
     };
     const spooled = () =>
-      (JSON.parse(readPrivate(join(f.c.dir, "spool.json"))) as {
-        events: { runId: string; sequence: number }[];
-      }).events;
+      (
+        JSON.parse(readPrivate(join(f.c.dir, "spool.json"))) as {
+          events: { runId: string; sequence: number }[];
+        }
+      ).events;
     const claim = {
       type: "item.completed",
       thread_id: "thread-stable",
@@ -741,7 +766,10 @@ test("receive orders accepted events per stable session and enqueues nothing uns
     const { thread_id: _, ...idless } = claim;
     assert.deepEqual(receive(idless), { received: true, reason: "queued" });
     const before = readPrivate(join(f.c.dir, "spool.json"));
-    assert.deepEqual(receive({ type: "turn.started" }), { received: false, reason: "unsupported-event" });
+    assert.deepEqual(receive({ type: "turn.started" }), {
+      received: false,
+      reason: "unsupported-event",
+    });
     assert.equal(readPrivate(join(f.c.dir, "spool.json")), before);
   } finally {
     f.close();

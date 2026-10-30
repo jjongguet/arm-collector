@@ -1,5 +1,7 @@
+#!/usr/bin/env node
 import { join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+import { realpathSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
@@ -463,10 +465,20 @@ export async function main(args = process.argv.slice(2)) {
       );
   }
 }
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
-) {
+/**
+ * A package `bin` entry is installed as a symlink. Node resolves the main
+ * module to its real path, so comparing argv[1] verbatim would leave the
+ * installed `arm-collector` command running nothing and exiting 0.
+ */
+function isMainEntry(entry: string | undefined) {
+  if (!entry) return false;
+  try {
+    return realpathSync(resolve(entry)) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+}
+if (isMainEntry(process.argv[1])) {
   main().catch((error: unknown) => {
     if (process.argv[2] === "receive") return;
     // Map only reproduced, non-sensitive failure shapes to a next action. Raw
