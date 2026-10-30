@@ -2,7 +2,7 @@
   "schema": "arm-mirror-manifest.v1",
   "source": {
     "repository": "jjongguet/agent-reliability-monitor",
-    "commit": "c395d27732bf7816418508aa7337a6379d763112"
+    "commit": "12263a217f580bc6619d06190bbffcf0e2e5cd5e"
   },
   "package": {
     "name": "arm-collector",
