@@ -103,11 +103,32 @@ test("the exported collector surface is pinned", () => {
 
 // The mirror package is the install surface (JJO-1174): a git tag install has no
 // build step, so every advertised target must be a path this build emits.
+// npm 11 leaves a global `github:` install as a symlink into a deleted temp
+// clone, so the documented channel is the tag tarball, and every install
+// example must name the tag the mirror job publishes for this version.
+test("install docs use the tag tarball of the current mirror version", () => {
+  const url = `https://codeload.github.com/jjongguet/arm-collector/tar.gz/refs/tags/v${mirror.version}`;
+  const docs =
+    MIRROR_ROOT === "mirror"
+      ? ["README.md", "docs/sdk.md", "mirror/README.md"]
+      : ["README.md"];
+  for (const doc of docs) {
+    const text = readFileSync(doc, "utf8");
+    assert.ok(text.includes(`npm i -g "${url}"`), `${doc} installs ${url}`);
+    assert.doesNotMatch(text, /^npm i -g "?github:/m, `${doc} uses github:`);
+    const tags = text.match(/refs\/tags\/v\d+\.\d+\.\d+/g) ?? [];
+    assert.ok(
+      tags.every((tag) => tag.endsWith(`v${mirror.version}`)),
+      `${doc} names a stale tag`,
+    );
+  }
+});
+
 test("the mirror package points at paths this build emits", () => {
   assert.equal(mirror.name, "arm-collector");
   assert.equal(mirror.private, false);
   assert.equal(mirror.engines.node, ">=24.15");
-  assert.equal(mirror.version, "0.1.0");
+  assert.match(mirror.version, /^\d+\.\d+\.\d+$/);
   assert.deepEqual(Object.keys(mirror.bin), ["arm-collector"]);
   const bin = mirror.bin["arm-collector"] ?? assert.fail("no bin entry");
   const targets = [

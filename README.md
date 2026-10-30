@@ -17,17 +17,20 @@ collector는 `engines` 기준 Node ≥24.15가 필요하다(모든 이후 minor 
 ### GitHub 태그에서 설치 (권장)
 
 ```sh
-npm i -g "github:jjongguet/arm-collector#v0.1.0"
+npm i -g "https://codeload.github.com/jjongguet/arm-collector/tar.gz/refs/tags/v0.1.1"
 arm-collector status --dir "$HOME/.agent-reliability-monitor/private"
 ```
+
+`github:` 형식(`npm i -g github:jjongguet/arm-collector#v0.1.1`)은 npm 11에서 전역 설치 후 실행 파일이 사라지므로 태그 tarball URL을 쓴다.
+
 
 빌드된 `dist/`가 저장소에 함께 실리므로 설치 시 TypeScript 컴파일이나 개발 의존성 설치가 필요 없다. 설치 시 네트워크에서 받는 것은 런타임 의존성(`zod`)뿐이다.
 
 ### 로컬 tarball에서 설치
 
 ```sh
-npm pack                                  # arm-collector-0.1.0.tgz 생성
-npm i -g ./arm-collector-0.1.0.tgz
+npm pack                                  # arm-collector-0.1.1.tgz 생성
+npm i -g ./arm-collector-0.1.1.tgz
 ```
 
 ### clone해서 쓰기

@@ -1,6 +1,6 @@
 {
   "name": "arm-collector",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "type": "module",
   "description": "Agent Reliability Monitor collector SDK and CLI (generated read-only mirror of jjongguet/agent-reliability-monitor).",

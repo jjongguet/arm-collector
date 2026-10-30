@@ -2,18 +2,18 @@
   "schema": "arm-mirror-manifest.v1",
   "source": {
     "repository": "jjongguet/agent-reliability-monitor",
-    "commit": "bbc2b6dc33f55511ffab7f257d5fa9e515d07283"
+    "commit": "4e1bd8f0e94e3c27eb869d331e36950b5d241e09"
   },
   "package": {
     "name": "arm-collector",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
-  "tag": "v0.1.0",
-  "tree": "c73737fdd59a9481a6fcf3bd3aba9244663a67e3292e44111ddfbd24c6c3d73a",
+  "tag": "v0.1.1",
+  "tree": "406f0bef561bdb3e552a238ecfe99c22f2943bfe94a99f04509275b35ba6f01d",
   "files": {
     ".gitignore": "ba79bbc25fa8951489e77f28f1561c2e9388115cb33f1c606424f8e08169f96b",
     "LICENSE": "ec8f37aa2c4c556588b0f5c4b1c2a2567b8e0f4e7d5cc3ecb688a0ea2c3ecc96",
-    "README.md": "cc45a4f76de6ef98666617f1624d74686b285ab718337504375a84fdebf071fc",
+    "README.md": "19001352e9acbabfc3381e442f8cc9c611f20c292ab731cd56bec2bf8c6a5a1e",
     "dist/adapters/public.d.ts": "501eb34b6e5f4087768ac993ea3697cf522ae1c654f6ceb80ab9b055468fa4e9",
     "dist/adapters/public.js": "a4514bbe65de813b267a994c48200c3b2970da4f55a2873ce3924d1aab02eadd",
     "dist/collector/cli.d.ts": "71d943215b004c39cde702a9c66ed8ee34eb7a94df42ec72f5d0ac9e3921be0a",
@@ -26,8 +26,8 @@
     "dist/collector/storage.js": "1ae864813884c269fe9b682924079cd750245564b1d66d9e609656f57b76906a",
     "dist/core/public.d.ts": "ca7e7b501ca2fee3c763c4b1e94a8699ba5162502d44bd4cb88aa2925e9eaa66",
     "dist/core/public.js": "44c5b507008fdc8e430734a6a6a7e9bdd92ea4f78f43b10cadacf644d6bdcfcc",
-    "package-lock.json": "065a0c81d90b75f233c09b1f9d24b7ca408584cc3e39ecf5d9c9381e3b4c35c9",
-    "package.json": "dd2a49e645b9989e55f95b7938651a9066ff09235355a445da5aef8e3a4162ec",
+    "package-lock.json": "2d93331fe0cd1f51cfd59d5a0ecaca0ab98f6d9d1a0eff1dd5bad7bca1247f8d",
+    "package.json": "d8e8a820e7a7d1b1dca641e44f8f206842cbd1c716449636fb6bba695c9da443",
     "packages/adapters/public.ts": "a081ede64f13d09fcbc5974b7b833fb15b3bfd7d32eef278d832d46765541f6e",
     "packages/adapters/support.json": "f18d3074b2d03ed20982574ca2f36037314391cff4acd4e706325bed5f948ee3",
     "packages/collector/cli.ts": "e499444ddce70518cb1bcf5819c3f24dc545e97dc560a7cc74d86c3c8c9c596b",
@@ -36,7 +36,7 @@
     "packages/collector/storage.ts": "6350991c31686c39598b56781ff1892777f9ea88aedff76aeec147f451f41c44",
     "packages/core/public.ts": "8dce0be62c115054fae130519f0277e8305de7efb0fd34635e52fa52a6a9136d",
     "tests/codex-tamper-evidence.test.ts": "383cbb7e672881049cb1f44253a011d8ade0a702ed85624a87fac0547fd46e89",
-    "tests/collector-contract.test.ts": "ef05e21f201fb1f1885d87bddd1ef2bb220c5b9b93ebf501707d5f350961ca82",
+    "tests/collector-contract.test.ts": "1239d157a7202dbd7c5f199b2af88d08f61c83eee3ac2c6074e3edc0662b117e",
     "tests/collector.test.ts": "aa013ca86579dc55a7926a972b64a9f62da2bc81e4ad22ebd95ec7de9c1b9412",
     "tests/compiled-cli.test.ts": "03384f50dcb7ad9c669f78d964b6bf971259563963fb81a08e53a638b243843c",
     "tests/core.test.ts": "6ac9845bf2719c6defd2ff6b2174a6f41af96761d72200caa53ca46266e92d7b",
