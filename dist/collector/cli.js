@@ -267,6 +267,63 @@ export async function main(args = process.argv.slice(2)) {
             console.log(JSON.stringify(claudeSetup(project, dir, fileURLToPath(import.meta.url), args.includes("--apply"), args.includes("--uninstall"))));
             break;
         }
+        case "wrap": {
+            // Any CLI agent, in any environment, without a plugin system: run the
+            // command, observe its real exit status, record the outcome, and pass the
+            // status through unchanged. The child's raw output is never captured.
+            const host = option("--host");
+            if (!host || !/^[a-z0-9][a-z0-9._-]{0,39}$/.test(host)) {
+                console.log(JSON.stringify({ recorded: false, reason: "invalid-host" }));
+                process.exitCode = 2;
+                break;
+            }
+            const split = args.indexOf("--");
+            const child = split >= 0 ? args.slice(split + 1) : [];
+            if (!child.length) {
+                console.log(JSON.stringify({ recorded: false, reason: "missing-command" }));
+                process.exitCode = 2;
+                break;
+            }
+            const started = Date.now();
+            const outcome = await new Promise((done) => {
+                const subprocess = spawn(child[0], child.slice(1), {
+                    stdio: "inherit",
+                });
+                subprocess.on("error", () => done({ status: 127, signal: null }));
+                subprocess.on("close", (status, signal) => done({ status, signal }));
+            });
+            const status = outcome.status ?? 1;
+            let recorded = false, reason = "unsupported-event";
+            try {
+                const sequence = collector.nextSequence(`wrap-${host}`);
+                const event = normalizeHost(status === 0
+                    ? { kind: "health", hostVersion: "0.0.0" }
+                    : {
+                        kind: "error",
+                        hostVersion: "0.0.0",
+                        error: {
+                            class: "tool-failed",
+                            progress: `exit:${status === 127 ? "spawn-failed" : status}:${child[0].split("/").pop() ?? "command"}`,
+                        },
+                    }, host, collector, sequence);
+                if (event) {
+                    event.time = started;
+                    recorded = collector.enqueue(event);
+                    reason = recorded ? "queued" : "duplicate";
+                }
+            }
+            catch {
+                reason = "receive-error";
+            }
+            console.log(JSON.stringify({
+                recorded,
+                reason,
+                exitCode: outcome.status,
+                signal: outcome.signal,
+            }));
+            process.exitCode = status;
+            break;
+        }
         case "receive": {
             // Host hooks must never fail a session: every outcome prints one receipt
             // line with an explicit reason and the process exits 0.
@@ -401,7 +458,7 @@ export async function main(args = process.argv.slice(2)) {
             break;
         }
         default:
-            console.log("Commands: connect, redeem, status, report, flush, worker --opt-in, rotate, disconnect, receive, setup, codex-fixture --opt-in [--passing] [--capability-probe], codex-exec --opt-in --project PATH --scope FILES --tests FILES -- PROMPT, isolated-test --opt-in --project PATH. Use --dir PRIVATE_DIR. General workspace coverage remains unproven.");
+            console.log("Commands: connect, redeem, status, report, flush, worker --opt-in, rotate, disconnect, receive, wrap --host <id> -- COMMAND, setup, codex-fixture --opt-in [--passing] [--capability-probe], codex-exec --opt-in --project PATH --scope FILES --tests FILES -- PROMPT, isolated-test --opt-in --project PATH. Use --dir PRIVATE_DIR. General workspace coverage remains unproven.");
     }
 }
 /**

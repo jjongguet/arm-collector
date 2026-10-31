@@ -453,6 +453,62 @@ test("generic receive accepts a host identifier and rejects malformed hosts", ()
     f.close();
   }
 });
+test("wrap observes any CLI agent's real exit status and passes it through", () => {
+  const f = fixture();
+  try {
+    const wrap = (host: string, argv: string[]) => {
+      const result = spawnSync(
+        process.execPath,
+        [
+          "packages/collector/cli.ts",
+          "wrap",
+          "--host",
+          host,
+          "--dir",
+          f.c.dir,
+          "--",
+          ...argv,
+        ],
+        { encoding: "utf8" },
+      );
+      return {
+        status: result.status,
+        receipt: JSON.parse(result.stdout.trim().split("\n").at(-1)!) as {
+          recorded: boolean;
+          reason: string;
+          exitCode: number | null;
+        },
+      };
+    };
+    const failed = wrap("cursor", [process.execPath, "-e", "process.exit(3)"]);
+    assert.equal(failed.status, 3, "the child exit status passes through");
+    assert.equal(failed.receipt.recorded, true);
+    assert.equal(failed.receipt.exitCode, 3);
+    const passing = wrap("gemini-cli", [process.execPath, "-e", "0"]);
+    assert.equal(passing.status, 0);
+    assert.equal(passing.receipt.recorded, true);
+    assert.deepEqual(wrap("Bad Host", [process.execPath, "-e", "0"]), {
+      status: 2,
+      receipt: { recorded: false, reason: "invalid-host" },
+    });
+    const spool = JSON.parse(
+      readFileSync(join(f.c.dir, "spool.json"), "utf8"),
+    ) as { events?: { host: string; kind: string; errorClass: string }[] };
+    const events = spool.events ?? [];
+    assert.equal(events.length, 2);
+    assert.deepEqual(
+      events.map((e) => [e.host, e.kind, e.errorClass]),
+      [
+        ["cursor", "error", "tool-failed"],
+        ["gemini-cli", "health", "none"],
+      ],
+    );
+    assert.equal(judge(events[0] as never), null, "a single failure is not D2");
+  } finally {
+    f.close();
+  }
+});
+
 test("raw secret canaries never enter normalized spool or report", () => {
   const f = fixture();
   try {
