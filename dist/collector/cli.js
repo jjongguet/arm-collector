@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { Collector, request, approvedOrigin, collectorWorker, createOwnedFixture, prepareIsolatedSelection, runIsolatedNodeTest, closeIsolatedSelection, IsolatedRefusal, } from "./public.js";
 import { readPrivate, atomicPrivate, removePrivate } from "./storage.js";
 import { normalizeHost, claudeSetup, hostContext } from "../adapters/public.js";
+import { createMcpHandler, readCredential } from "./mcp.js";
 export function validateCodexArgs(args) {
     // Allowlist: no output files, config overrides, resumes, alternate working dirs,
     // sandbox/approval overrides, attachments, search, or persistence controls.
@@ -324,6 +325,39 @@ export async function main(args = process.argv.slice(2)) {
             process.exitCode = status;
             break;
         }
+        case "mcp": {
+            // Read path for agents: the same device credential that pushes events can
+            // ask what ARM observed. Line-delimited JSON-RPC on stdio; no events sent.
+            const handler = createMcpHandler(readCredential(dir));
+            let buffer = "";
+            for await (const chunk of process.stdin) {
+                buffer += chunk.toString();
+                let index = buffer.indexOf("\n");
+                while (index >= 0) {
+                    const line = buffer.slice(0, index).trim();
+                    buffer = buffer.slice(index + 1);
+                    index = buffer.indexOf("\n");
+                    if (!line)
+                        continue;
+                    let request;
+                    try {
+                        request = JSON.parse(line);
+                    }
+                    catch {
+                        console.log(JSON.stringify({
+                            jsonrpc: "2.0",
+                            id: null,
+                            error: { code: -32700, message: "parse error" },
+                        }));
+                        continue;
+                    }
+                    const reply = await handler(request);
+                    if (reply)
+                        console.log(JSON.stringify(reply));
+                }
+            }
+            break;
+        }
         case "receive": {
             // Host hooks must never fail a session: every outcome prints one receipt
             // line with an explicit reason and the process exits 0.
@@ -458,7 +492,7 @@ export async function main(args = process.argv.slice(2)) {
             break;
         }
         default:
-            console.log("Commands: connect, redeem, status, report, flush, worker --opt-in, rotate, disconnect, receive, wrap --host <id> -- COMMAND, setup, codex-fixture --opt-in [--passing] [--capability-probe], codex-exec --opt-in --project PATH --scope FILES --tests FILES -- PROMPT, isolated-test --opt-in --project PATH. Use --dir PRIVATE_DIR. General workspace coverage remains unproven.");
+            console.log("Commands: connect, redeem, status, report, flush, worker --opt-in, rotate, disconnect, receive, wrap --host <id> -- COMMAND, mcp, setup, codex-fixture --opt-in [--passing] [--capability-probe], codex-exec --opt-in --project PATH --scope FILES --tests FILES -- PROMPT, isolated-test --opt-in --project PATH. Use --dir PRIVATE_DIR. General workspace coverage remains unproven.");
     }
 }
 /**
