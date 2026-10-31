@@ -17,20 +17,19 @@ collector는 `engines` 기준 Node ≥24.15가 필요하다(모든 이후 minor 
 ### GitHub 태그에서 설치 (권장)
 
 ```sh
-npm i -g "https://codeload.github.com/jjongguet/arm-collector/tar.gz/refs/tags/v0.1.1"
+npm i -g "https://codeload.github.com/jjongguet/arm-collector/tar.gz/refs/tags/v0.1.2"
 arm-collector status --dir "$HOME/.agent-reliability-monitor/private"
 ```
 
-`github:` 형식(`npm i -g github:jjongguet/arm-collector#v0.1.1`)은 npm 11에서 전역 설치 후 실행 파일이 사라지므로 태그 tarball URL을 쓴다.
-
+`github:` 형식(`npm i -g github:jjongguet/arm-collector#v0.1.2`)은 npm 11에서 전역 설치 후 실행 파일이 사라지므로 태그 tarball URL을 쓴다.
 
 빌드된 `dist/`가 저장소에 함께 실리므로 설치 시 TypeScript 컴파일이나 개발 의존성 설치가 필요 없다. 설치 시 네트워크에서 받는 것은 런타임 의존성(`zod`)뿐이다.
 
 ### 로컬 tarball에서 설치
 
 ```sh
-npm pack                                  # arm-collector-0.1.1.tgz 생성
-npm i -g ./arm-collector-0.1.1.tgz
+npm pack                                  # arm-collector-0.1.2.tgz 생성
+npm i -g ./arm-collector-0.1.2.tgz
 ```
 
 ### clone해서 쓰기
@@ -62,21 +61,21 @@ arm-collector status --dir "$ARM_STATE"
 
 `setup`은 변경 사항을 먼저 미리보기로 출력하고, `--apply`를 붙여야 실제로 프로젝트에 Stop hook을 설치한다. 이 SDK는 launchd·cron·systemd 같은 호스트 상주 서비스를 스스로 설치하지 않는다.
 
-| 명령 | 동작 |
-| --- | --- |
-| `connect --origin URL --approve-origin` | pairing 코드 발급(1회용, 10분) |
-| `redeem` | 대시보드 승인 후 기기 자격 증명 수령 |
-| `status` | 연결·spool 상태 JSON |
-| `report` | 로컬 판정 요약 |
-| `flush` | opt-in 전송. 호출 1회당 최대 100개·256KiB 배치 1건 |
-| `worker --opt-in` | 포그라운드에서 주기적으로 flush(기본 1초, 100ms~60s) |
-| `rotate` | 기기 자격 증명 회전(이전 즉시 무효) |
-| `disconnect` | 서버 자격 증명 폐기 + 로컬 자격 증명·spool 제거 |
-| `setup --host claude-code --project PATH [--apply\|--uninstall]` | 프로젝트 범위 `.claude/settings.local.json`에 marker 항목만 추가/제거 |
-| `receive --host claude-code\|codex` | hook 수신(stdin 3초·256KB 상한) |
-| `codex-fixture --opt-in [--passing] [--capability-probe]` | controlled owned fixture 프로브 |
-| `codex-exec --opt-in --project PATH --scope FILES --tests FILES -- PROMPT` | 승인 범위 명시 실행 wrapper |
-| `isolated-test --opt-in --project PATH` | 고정 macOS 격리 profile 실행 |
+| 명령                                                                       | 동작                                                                                                                                                   |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `connect --origin URL --approve-origin`                                    | pairing 코드 발급(1회용, 10분)                                                                                                                         |
+| `redeem`                                                                   | 대시보드 승인 후 기기 자격 증명 수령                                                                                                                   |
+| `status`                                                                   | 연결·spool 상태 JSON                                                                                                                                   |
+| `report`                                                                   | 로컬 판정 요약                                                                                                                                         |
+| `flush`                                                                    | opt-in 전송. 호출 1회당 최대 100개·256KiB 배치 1건                                                                                                     |
+| `worker --opt-in`                                                          | 포그라운드에서 주기적으로 flush(기본 1초, 100ms~60s)                                                                                                   |
+| `rotate`                                                                   | 기기 자격 증명 회전(이전 즉시 무효)                                                                                                                    |
+| `disconnect`                                                               | 서버 자격 증명 폐기 + 로컬 자격 증명·spool 제거                                                                                                        |
+| `setup --host claude-code --project PATH [--apply\|--uninstall]`           | 프로젝트 범위 `.claude/settings.local.json`에 marker 항목만 추가/제거                                                                                  |
+| `receive --host <id>`                                                      | 모든 코딩 에이전트의 수신 입구(stdin 3초·256KB 상한). `claude-code`·`codex`는 네이티브 payload, 그 밖의 식별자는 범용 envelope(`kind`/`claim`/`error`) |
+| `codex-fixture --opt-in [--passing] [--capability-probe]`                  | controlled owned fixture 프로브                                                                                                                        |
+| `codex-exec --opt-in --project PATH --scope FILES --tests FILES -- PROMPT` | 승인 범위 명시 실행 wrapper                                                                                                                            |
+| `isolated-test --opt-in --project PATH`                                    | 고정 macOS 격리 profile 실행                                                                                                                           |
 
 ## 로컬 spool 한도
 

@@ -15,7 +15,7 @@ export declare class Collector {
         toolCallId: string;
         sequence: number;
         time: number;
-        host: "claude-code" | "codex" | "fixture";
+        host: string;
         adapterVersion: "1";
         hostVersion: string;
         nodeMajor: number;
@@ -63,7 +63,7 @@ export declare class Collector {
             toolCallId: string;
             sequence: number;
             time: number;
-            host: "claude-code" | "codex" | "fixture";
+            host: string;
             adapterVersion: "1";
             hostVersion: string;
             nodeMajor: number;

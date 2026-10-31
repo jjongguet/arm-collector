@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from "node:crypto";
+import { z } from "zod";
 import { readFileSync, existsSync, mkdirSync, lstatSync } from "node:fs";
 import { join, resolve, basename } from "node:path";
 import {
@@ -18,6 +19,42 @@ import {
 } from "../collector/storage.ts";
 import { classifyClaim, parseTap } from "../core/public.ts";
 import type { Event, Evidence } from "../core/public.ts";
+
+/**
+ * Generic host envelope for any coding agent that is not Claude Code or Codex.
+ * It carries only the observation itself: a claim's text is classified and
+ * discarded, and no evidence is accepted. A host cannot certify its own work,
+ * so generic claims stay `unknown` in judgement and only the collector's own
+ * approved test runs can produce stronger verdicts.
+ */
+export const genericHostSchema = z
+  .object({
+    kind: z.enum(["claim", "error", "test-edit", "health"]),
+    hostVersion: z
+      .string()
+      .regex(/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][a-zA-Z0-9.-]+)?$/)
+      .optional(),
+    runId: z
+      .string()
+      .regex(/^[a-zA-Z0-9_-]{1,80}$/)
+      .optional(),
+    turnId: z
+      .string()
+      .regex(/^[a-zA-Z0-9_-]{1,80}$/)
+      .optional(),
+    claim: z
+      .object({ role: z.string().max(40), text: z.string().max(32768) })
+      .strict()
+      .optional(),
+    error: z
+      .object({
+        class: z.enum(["test-failed", "tool-failed"]),
+        progress: z.string().max(4096).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 // Explicit local diagnostic claim, not a claim that the model ran these tests.
 // Only the original in-process observation can authorize isolated evidence;
@@ -123,9 +160,40 @@ export function approvedTestCommand(
     )
   );
 }
+export function genericEvent(
+  raw: unknown,
+  host: string,
+  collector: Collector,
+  sequence: number,
+): Event | null {
+  const parsed = genericHostSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const p = parsed.data;
+  if (p.kind === "claim" && !p.claim) return null;
+  if (p.kind === "error" && !p.error) return null;
+  const key = collector.key();
+  const opaque = (v: string) =>
+    createHmac("sha256", key).update(v.slice(0, 32768)).digest("hex");
+  const event = baseEvent(host, opaque(p.runId ?? randomUUID()), sequence);
+  event.hostVersion = p.hostVersion ?? "0.0.0";
+  event.turnId = opaque(p.turnId ?? `turn:${sequence}`);
+  // No generic host establishes the runner's Node version, scope digests or
+  // coverage. Evidence stays null, so D1 can only answer `unknown`.
+  event.nodeMajor = 0;
+  event.kind = p.kind;
+  if (p.kind === "claim")
+    event.claimClass = classifyClaim(p.claim!.text, p.claim!.role);
+  if (p.kind === "error") {
+    event.errorClass = p.error!.class;
+    event.progressFingerprint = p.error!.progress
+      ? opaque(`generic:${p.error!.class}:${p.error!.progress}`)
+      : null;
+  }
+  return event;
+}
 export function normalizeHost(
   raw: unknown,
-  host: "claude-code" | "codex",
+  host: string,
   collector: Collector,
   sequence: number,
   context?: HostContext,
@@ -136,6 +204,10 @@ export function normalizeHost(
     Buffer.byteLength(JSON.stringify(raw)) > 262144
   )
     return null;
+  // Every other coding agent reports through the generic envelope. There is no
+  // per-host parser to add: the contract is the SDK, not the host brand.
+  if (host !== "claude-code" && host !== "codex")
+    return genericEvent(raw, host, collector, sequence);
   const p = raw as Record<string, unknown>,
     key = collector.key();
   const opaque = (v: unknown) =>

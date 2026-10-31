@@ -330,8 +330,13 @@ export async function main(args = process.argv.slice(2)) {
         reason = "receive-error";
       try {
         const host = option("--host");
-        if (host !== "claude-code" && host !== "codex")
-          throw new Error("Explicit host required");
+        if (!host || !/^[a-z0-9][a-z0-9._-]{0,39}$/.test(host)) {
+          // Still a receipt line with exit 0: a hook must never fail a session.
+          console.log(
+            JSON.stringify({ received: false, reason: "invalid-host" }),
+          );
+          break;
+        }
         let input = "",
           over = false;
         // Native async hooks do not enforce their configured timeout.

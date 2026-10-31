@@ -2,6 +2,10 @@ import { z } from "zod";
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/);
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const count = z.number().int().min(0).max(1000000);
+// Any coding agent may report under its own identifier. The value is a bounded
+// label, not a trust claim: strong verdicts still require evidence the collector
+// observed itself (owned fixture), never what a host asserts about itself.
+const hostId = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,39}$/);
 export const evidenceSchema = z
     .object({
     runnerProfile: z.enum([
@@ -43,7 +47,7 @@ export const eventSchema = z
     toolCallId: id,
     sequence: count,
     time: z.number().int().min(0),
-    host: z.enum(["claude-code", "codex", "fixture"]),
+    host: hostId,
     adapterVersion: z.literal("1"),
     hostVersion: z
         .string()

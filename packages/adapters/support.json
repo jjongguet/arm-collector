@@ -17,7 +17,11 @@
   ],
   "claudeCode": {
     "transport": "opt-in project command hooks (sync Stop/test-edit; async Bash failure feed)",
-    "events": ["Stop", "PostToolUseFailure", "PostToolUse"],
+    "events": [
+      "Stop",
+      "PostToolUseFailure",
+      "PostToolUse"
+    ],
     "actualProviderSessionTested": true,
     "actualProductCallbacksVerified": [
       "sync Stop claim via product factory config (delivered 2ms after session exit)",
@@ -71,5 +75,23 @@
     "Crash lock is fail-closed and requires owned manual recovery",
     "No backup/remote deployment policy implemented",
     "Project .claude directory must be private 0700 before explicit setup apply"
-  ]
+  ],
+  "genericHost": {
+    "transport": "single JSON envelope on stdin to `receive --host <id>` (3s, 256KB)",
+    "acceptedKinds": [
+      "claim",
+      "error",
+      "test-edit",
+      "health"
+    ],
+    "evidenceAccepted": false,
+    "D1": "unknown only: a host cannot certify its own test outcome; strong verdicts require the collector's own approved run",
+    "D2": "suspected possible when error.class repeats with the same bounded progress HMAC",
+    "nodeMajor": 0,
+    "requires": [
+      "explicit --host identifier",
+      "paired device",
+      "user-owned 0700 state dir"
+    ]
+  }
 }

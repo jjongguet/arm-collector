@@ -320,6 +320,139 @@ test("local repeated-error findings become unknown with a coverage gap without r
     f.close();
   }
 });
+test("any coding agent reports through one generic envelope; raw text never lands and judge stays unknown", () => {
+  const f = fixture();
+  try {
+    const canary =
+      "PROVIDER-TOKEN-canary prompt /Users/private@example.com/source";
+    const claim = normalizeHost(
+      {
+        kind: "claim",
+        hostVersion: "2.4.0",
+        claim: { role: "assistant", text: "All tests passed." },
+        prompt: canary,
+        source: canary,
+      },
+      "cursor",
+      f.c,
+      1,
+    );
+    assert.equal(claim, null, "unknown envelope keys are rejected outright");
+    const generic = normalizeHost(
+      {
+        kind: "claim",
+        hostVersion: "2.4.0",
+        claim: { role: "assistant", text: canary },
+      },
+      "cursor",
+      f.c,
+      1,
+    )!;
+    assert.equal(generic.host, "cursor");
+    assert.equal(generic.kind, "claim");
+    assert.equal(generic.claimClass, "ambiguous", "canary text is classified");
+    assert.equal(
+      generic.evidence,
+      null,
+      "self-certified evidence is not accepted",
+    );
+    assert.equal(
+      generic.nodeMajor,
+      0,
+      "no host establishes the runner version",
+    );
+    assert.equal(
+      normalizeHost(
+        {
+          kind: "claim",
+          claim: { role: "assistant", text: "All tests passed." },
+        },
+        "cursor",
+        f.c,
+        2,
+      )!.claimClass,
+      "tests-passed",
+    );
+    const passing = normalizeHost(
+      {
+        kind: "claim",
+        claim: { role: "assistant", text: "All tests passed." },
+      },
+      "cursor",
+      f.c,
+      3,
+    )!;
+    assert.equal(
+      judge(passing)?.status,
+      "unknown",
+      "a generic host cannot resolve its own claim",
+    );
+    const failed = normalizeHost(
+      { kind: "error", error: { class: "test-failed", progress: canary } },
+      "gjc",
+      f.c,
+      4,
+    )!;
+    assert.equal(failed.errorClass, "test-failed");
+    assert.equal(failed.host, "gjc");
+    assert.ok(failed.progressFingerprint);
+    for (const e of [generic, passing, failed]) f.c.enqueue(e);
+    const disk = readFileSync(join(f.c.dir, "spool.json"), "utf8"),
+      report = JSON.stringify(f.c.report());
+    assert.ok(
+      !disk.includes(canary),
+      "claim and progress text are never stored",
+    );
+    assert.ok(!disk.includes("/Users/"));
+    assert.ok(!report.includes(canary));
+  } finally {
+    f.close();
+  }
+});
+test("generic receive accepts a host identifier and rejects malformed hosts", () => {
+  const f = fixture();
+  try {
+    const receive = (host: string, payload: unknown) => {
+      const result = spawnSync(
+        process.execPath,
+        [
+          "packages/collector/cli.ts",
+          "receive",
+          "--host",
+          host,
+          "--dir",
+          f.c.dir,
+        ],
+        { input: JSON.stringify(payload), encoding: "utf8" },
+      );
+      assert.equal(result.status, 0, result.stderr);
+      return JSON.parse(result.stdout) as { received: boolean; reason: string };
+    };
+    assert.deepEqual(
+      receive("gemini-cli", {
+        kind: "claim",
+        claim: { role: "assistant", text: "All tests passed." },
+      }),
+      { received: true, reason: "queued" },
+    );
+    assert.deepEqual(receive("Cursor CLI", { kind: "health" }), {
+      received: false,
+      reason: "invalid-host",
+    });
+    assert.deepEqual(receive("cursor", { kind: "claim" }), {
+      received: false,
+      reason: "unsupported-event",
+    });
+    const spool = JSON.parse(
+      readFileSync(join(f.c.dir, "spool.json"), "utf8"),
+    ) as { events?: { host: string }[] } | { host: string }[];
+    const events = Array.isArray(spool) ? spool : (spool.events ?? []);
+    assert.equal(events.length, 1);
+    assert.equal(events[0]!.host, "gemini-cli");
+  } finally {
+    f.close();
+  }
+});
 test("raw secret canaries never enter normalized spool or report", () => {
   const f = fixture();
   try {

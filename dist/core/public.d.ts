@@ -41,11 +41,7 @@ export declare const eventSchema: z.ZodObject<{
     toolCallId: z.ZodString;
     sequence: z.ZodNumber;
     time: z.ZodNumber;
-    host: z.ZodEnum<{
-        "claude-code": "claude-code";
-        codex: "codex";
-        fixture: "fixture";
-    }>;
+    host: z.ZodString;
     adapterVersion: z.ZodLiteral<"1">;
     hostVersion: z.ZodString;
     nodeMajor: z.ZodNumber;
@@ -110,11 +106,7 @@ export declare const batchSchema: z.ZodObject<{
         toolCallId: z.ZodString;
         sequence: z.ZodNumber;
         time: z.ZodNumber;
-        host: z.ZodEnum<{
-            "claude-code": "claude-code";
-            codex: "codex";
-            fixture: "fixture";
-        }>;
+        host: z.ZodString;
         adapterVersion: z.ZodLiteral<"1">;
         hostVersion: z.ZodString;
         nodeMajor: z.ZodNumber;
